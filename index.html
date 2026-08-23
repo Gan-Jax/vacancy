@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Hotel Simulator — Roadside Inn</title>
+    <link rel="stylesheet" href="css/style.css" />
+  </head>
+  <body>
+    <div id="app">
+      <header>
+        <h1>Hotel Simulator</h1>
+        <p class="subtitle">Roadside Inn — prototype</p>
+      </header>
+
+      <div id="hud">
+        <div class="stat cash-stat">
+          <span class="label">Cash</span> <span id="money">$0</span>
+          <button id="add-cash" type="button" class="debug-cash" title="Debug: add $500">+$500</button>
+          <button id="skip-day" type="button" class="debug-cash" title="Debug: fast-forward one day">+1 day</button>
+        </div>
+        <div class="stat clock-stat">
+          <span class="label">Time</span>
+          <span id="clock">8:00 AM</span>
+          <span id="tod" class="tod">Morning</span>
+        </div>
+        <div class="stat"><span class="label">Day</span> <span id="day">1</span></div>
+        <div class="stat"><span class="label">Guests waiting</span> <span id="queue">0</span></div>
+        <div class="stat"><span class="label">Reputation</span> <span id="reputation">50</span></div>
+        <div class="stat" id="vacancy-stat">
+          <span class="label">Sign</span> <span id="vacancy-status">VACANCY</span>
+        </div>
+        <div class="stat signal-stat" id="signal-stat" title="Open the radio log">
+          <span class="label">Radio</span> <span id="signal">—</span>
+        </div>
+      </div>
+      <div id="inventory-hud" class="inventory-hud"></div>
+      <div id="shelter-hud" class="shelter-hud hidden"></div>
+
+      <canvas id="game" width="1360" height="820"></canvas>
+
+      <div id="controls">
+        <p><strong>Move:</strong> WASD or arrow keys</p>
+        <p><strong>Interact:</strong> E — desk, office PC, unlock, inspect → clean → repair</p>
+        <p><strong>At the desk:</strong> E opens the arrival review — pick a question from the radio or paper, then admit or turn away</p>
+        <p><strong>Radio / paper:</strong> E on the lobby radio, E on the newspaper stack, or click the Radio HUD. Paper questions only unlock after you read the issue.</p>
+        <p><strong>Vacancy sign:</strong> V, shop button, or E on the bottom-center sign</p>
+        <p><strong>Pause:</strong> P</p>
+        <p><strong>Inspect layout:</strong> X — hover for name/position, click to log it for copy-paste</p>
+        <p><strong>Reinforce barricades:</strong> R — spends lumber (once the shelter is running)</p>
+        <p class="hint-inline">Order supplies on the office PC (24h delivery). Check-in needs soap/shampoo/conditioner each stay; towels every 10 stays; TP every 3 days.</p>
+      </div>
+
+      <div id="log-panel">
+        <h2>Activity log</h2>
+        <ul id="log"></ul>
+      </div>
+
+      <aside id="shop">
+        <h2>Front desk</h2>
+        <button id="toggle-vacancy" type="button">Set: NO VACANCY</button>
+        <h2>Staff</h2>
+        <button id="hire-bob" type="button">Hire Bob (repairs) — $150</button>
+        <button id="hire-mary" type="button">Hire Mary (inspect + clean) — $120</button>
+        <h2>Inn upgrades</h2>
+        <button id="unlock-room" disabled>Unlock room — $200</button>
+        <p class="hint">Room flow: Inspect → Clean → Repair. Staff earn $10/work day and come to the desk every 7 days for payday.</p>
+      </aside>
+    </div>
+
+    <div id="story-banner" class="story-banner hidden" aria-hidden="true">
+      <div class="story-card">
+        <span id="story-act" class="story-act"></span>
+        <h2 id="story-title"></h2>
+        <p id="story-body"></p>
+        <button id="story-dismiss" type="button">Continue</button>
+      </div>
+    </div>
+
+    <div id="desk-modal" class="modal hidden" aria-hidden="true">
+      <div class="modal-card desk-card">
+        <div class="modal-header">
+          <h2 id="desk-name">At the desk</h2>
+          <button id="desk-close" type="button" class="modal-close">Later</button>
+        </div>
+        <p id="desk-claim" class="modal-sub"></p>
+
+        <div class="desk-section">
+          <h3>What you notice</h3>
+          <ul id="desk-signs" class="desk-signs"></ul>
+        </div>
+
+        <div class="desk-section">
+          <h3>What they said</h3>
+          <div id="desk-reply" class="desk-reply">
+            <p class="desk-hint">Ask something. Their answer stays here — not just in the log.</p>
+          </div>
+        </div>
+
+        <div class="desk-section">
+          <h3>Ask from what you have heard</h3>
+          <p class="desk-hint">Radio questions are public. Everyone in this lobby has heard them — including the ones that are not people. Paper questions only appear after you read the issue.</p>
+          <div id="desk-questions" class="desk-questions"></div>
+        </div>
+
+        <div class="desk-section">
+          <h3>Why this decision</h3>
+          <div id="desk-why" class="desk-why"></div>
+        </div>
+
+        <div class="modal-actions desk-actions">
+          <button id="desk-refuse" type="button" class="desk-refuse">Turn away</button>
+          <button id="desk-admit" type="button" class="desk-admit">Admit</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="radio-modal" class="modal hidden" aria-hidden="true">
+      <div class="modal-card media-card">
+        <div class="modal-header">
+          <h2>Lobby radio</h2>
+          <button id="radio-close" type="button" class="modal-close">Close</button>
+        </div>
+        <p class="modal-sub">KCLR and whatever is still on the air. Everyone hears this. Do not treat it as a secret.</p>
+        <div id="radio-log" class="media-log"></div>
+      </div>
+    </div>
+
+    <div id="paper-modal" class="modal hidden" aria-hidden="true">
+      <div class="modal-card media-card paper-card">
+        <div class="modal-header">
+          <h2>Desk paper</h2>
+          <button id="paper-close" type="button" class="modal-close">Close</button>
+        </div>
+        <p class="modal-sub">What the broadcast left out. Reading an issue unlocks questions they have not all rehearsed.</p>
+        <div id="paper-log" class="media-log"></div>
+      </div>
+    </div>
+
+    <div id="pc-modal" class="modal hidden" aria-hidden="true">
+      <div class="modal-card">
+        <div class="modal-header">
+          <h2>Office PC — Supply Orders</h2>
+          <button id="pc-close" type="button" class="modal-close">Close</button>
+        </div>
+        <p class="modal-sub">Pay now · delivery in 24 game hours</p>
+        <div id="pc-stock" class="pc-stock"></div>
+        <div id="pc-order-rows" class="pc-order-rows"></div>
+        <div id="pc-pending" class="pc-pending"></div>
+        <div class="modal-actions">
+          <span id="pc-order-total">Total: $0</span>
+          <button id="pc-place-order" type="button">Place order</button>
+        </div>
+      </div>
+    </div>
+
+    <script type="module" src="js/main.js"></script>
+  </body>
+</html>
