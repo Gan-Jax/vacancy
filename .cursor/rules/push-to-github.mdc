@@ -1,0 +1,32 @@
+---
+description: Always commit and push finished work to GitHub
+alwaysApply: true
+---
+
+# Push finished work to GitHub
+
+This is Project H.O.R (`vacancy`). Its GitHub remote is
+https://github.com/Gan-Jax/vacancy
+
+After you change project files, publish those changes. Do not wait to be asked.
+
+## When to push
+
+- After finishing a feature, fix, or other file change
+- Treat a completed task as permission to commit and push
+- If Project RM (`hotel-simulator`) also changed, update that repo separately
+
+## How
+
+1. Review `git status` and `git diff`
+2. Do not commit secrets (`.env`, credentials, keys)
+3. Do not commit Unity generated folders (`Library/`, `Temp/`, `Obj/`, `Logs/`)
+4. Commit with a short message that explains why
+5. `git push` to `origin` on the current branch
+6. Mention the GitHub URL when done
+
+## Do not
+
+- Leave finished work only on this machine
+- Skip the push because the user did not say "commit" or "push"
+- Change git config, force-push, or skip hooks
