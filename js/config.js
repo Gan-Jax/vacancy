@@ -118,10 +118,14 @@ export const CONFIG = {
   /** After this many calendar days, staff come to the desk for payday. */
   staffPayPeriodDays: 7,
 
+  /** Fallback only — the real room count comes from the generated floorplan. */
   maxRooms: 12,
   startingUnlockedRooms: 3,
 
-  /** Room footprint used for drawing and collision. */
+  /**
+   * Room footprint. The floorplan snaps this to the nav grid and then fits as
+   * many rooms per row as the building allows, so this also sets room count.
+   */
   roomWidth: 118,
   roomHeight: 92,
 

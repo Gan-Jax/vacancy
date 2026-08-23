@@ -106,7 +106,7 @@ function deskSpawn(layout) {
 }
 
 function roomCenter(layout, roomId) {
-  return layout.roomCenters[roomId - 1];
+  return layout.roomInterior?.(roomId) ?? layout.roomCenters[roomId - 1];
 }
 
 function checkoutWaitSlot(layout, index) {
@@ -455,8 +455,7 @@ export function updateGuests(state, dt, layout) {
         }
         const atDoor = followPath(guest, dt, rooms, layout, null, speed);
         if (atDoor) {
-          const door =
-            layout.waypoints.points[layout.waypoints.doorIdx[guest.roomId - 1]];
+          const door = layout.roomDoor(guest.roomId);
           guest.x = door.x;
           guest.y = door.y;
           guest.nav = "enter_room";
@@ -511,8 +510,7 @@ export function updateGuests(state, dt, layout) {
       resolveRoomCollision(guest, rooms, layout, guestAllowRoom(guest));
 
       if (guest.nav === "exit_room") {
-        const door =
-          layout.waypoints.points[layout.waypoints.doorIdx[guest.roomId - 1]];
+        const door = layout.roomDoor(guest.roomId);
         const dist = Math.hypot(guest.x - door.x, guest.y - door.y);
         steerTo(guest, door.x, door.y, dt, rooms, layout, guest.roomId, speed);
         if (dist < 16) {

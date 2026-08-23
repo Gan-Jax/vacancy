@@ -150,12 +150,22 @@ medicine, and lumber**. From then on:
 | `js/economy.js` | Check-in/out, billing, guest movement, daily tick |
 | `js/inventory.js` | Hotel supplies + shelter orders through the office PC |
 | `js/entities.js` | Player and staff NPC behavior |
-| `js/pathing.js` | Shared waypoint pathfinding and collision |
-| `js/render.js` | Canvas drawing, layout, layout inspector |
+| `js/floorplan.js` | **The building, as data** — room bands, lobby, office, staff rooms |
+| `js/nav.js` | Turns the floorplan into a walkable grid + A* routing |
+| `js/pathing.js` | Movement on that grid (permits, collision, follow-path) |
+| `js/render.js` | Canvas drawing, layout view, layout inspector |
 | `js/main.js` | Wires everything together |
 
 `window.game` is exposed in the console (`state`, `layout`, `skipDay()`) for
 poking at story and shelter state directly.
+
+The hotel is **generated from data** (`js/floorplan.js` + `js/nav.js`): three
+guest-room bands, side corridors, lobby/office, and Mary's room / Bob's closet
+on the service band. Room count follows the canvas (~30 on 1360×820). Three
+rooms start unlocked.
+
+A Unity 2D port lives in [`Unity/`](Unity/README.md). Same floorplan, same
+story loop. Open that folder in Unity Hub.
 
 ## Next steps
 

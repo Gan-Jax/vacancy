@@ -3,10 +3,14 @@ import { createInventoryState } from "./inventory.js";
 import { createStoryState } from "./story.js";
 import { createShelterState } from "./shelter.js";
 
-/** Central game state — money, time, rooms, guests, staff. */
-export function createInitialState() {
+/**
+ * Central game state — money, time, rooms, guests, staff.
+ * The room count comes from the generated floorplan, so growing the building
+ * grows the books with it.
+ */
+export function createInitialState(roomCount = CONFIG.maxRooms) {
   const rooms = [];
-  for (let i = 0; i < CONFIG.maxRooms; i++) {
+  for (let i = 0; i < roomCount; i++) {
     rooms.push({
       id: i + 1,
       unlocked: i < CONFIG.startingUnlockedRooms,

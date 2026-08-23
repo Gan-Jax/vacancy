@@ -1,5 +1,7 @@
 import { getRepairCost, getRoomUnlockCost } from "./economy.js";
 import { CONFIG } from "./config.js";
+import { AREA, FLAGSHIP_GROUND, createFloor } from "./floorplan.js";
+import { buildNavGrid, validateFloor } from "./nav.js";
 
 /** Keyboard input helper. */
 export function createInput() {
@@ -62,117 +64,185 @@ export function createInput() {
   };
 }
 
+/**
+ * The layout is a thin view over the generated floorplan: it exposes named
+ * spots the rest of the game asks for, so nothing else needs to know how the
+ * building is shaped.
+ */
+export function createLayout(canvas) {
+  const width = canvas.width;
+  const height = canvas.height;
+  const building = { x: 48, y: 40, w: width - 96, h: height - 108 };
+
+  const floor = createFloor(FLAGSHIP_GROUND, building);
+  const navGrid = buildNavGrid(floor);
+
+  const desk = floor.frontDesk;
+  const housekeeping = floor.departments.housekeeping;
+  const maintenance = floor.departments.maintenance;
+  const deptForStaff = {
+    mary: housekeeping,
+    bob: maintenance,
+    housekeeping,
+    maintenance,
+  };
+
+  const lobbyRadio = {
+    x: desk.x - 110,
+    y: desk.y - 8,
+    w: 36,
+    h: 28,
+  };
+  const newspaper = {
+    x: desk.x - 38,
+    y: desk.y + 4,
+    w: 28,
+    h: 18,
+  };
+
+  return {
+    width,
+    height,
+    building,
+    floor,
+    navGrid,
+    tile: floor.tile,
+    rooms: floor.rooms,
+    roomCount: floor.rooms.length,
+    roomCenters: floor.rooms.map((room) => room.center),
+    cols: floor.roomsPerRow,
+    lobby: floor.lobby,
+    office: floor.office,
+    frontDesk: desk,
+    departments: floor.departments,
+    maidRoom: housekeeping,
+    handymanCloset: maintenance,
+    lobbyRadio,
+    newspaper,
+    vacancySign: { x: width / 2, y: height - 28, w: 140, h: 36 },
+    spawn: { x: desk.x, y: desk.y + 40 },
+
+    /** Public spot just outside a guest room's door. */
+    roomDoor(roomId) {
+      return floor.rooms[roomId - 1]?.approach ?? this.deskApproach();
+    },
+    roomInterior(roomId) {
+      return floor.rooms[roomId - 1]?.center ?? this.deskApproach();
+    },
+    roomRect(roomId) {
+      return floor.rooms[roomId - 1]?.rect ?? null;
+    },
+    officeDoor() {
+      return floor.office.approach;
+    },
+    /** Where characters queue up to reach the desk. */
+    deskApproach() {
+      return { x: desk.x, y: desk.y + 46 };
+    },
+    staffHome(key) {
+      const dept = deptForStaff[key] ?? maintenance;
+      return { x: dept.x, y: dept.y };
+    },
+    checkInLineSlot(index) {
+      return { x: desk.x + 96 + index * 40, y: desk.y + 30 };
+    },
+    checkoutLineSlot(index) {
+      // Wrap the queue into two rows so a full house never spills into the
+      // office or through the lobby's south wall.
+      const perRow = 8;
+      const col = index % perRow;
+      const row = Math.min(1, Math.floor(index / perRow));
+      return { x: desk.x - 96 - col * 38, y: desk.y + 24 + row * 26 };
+    },
+    staffPaySlot(staffId) {
+      const offset = staffId === "mary" ? 46 : 0;
+      return { x: desk.x - 30 + offset, y: desk.y - 40 };
+    },
+    /** Startup self-check that the generated floor is actually walkable. */
+    validate() {
+      return validateFloor(navGrid, floor, this.deskApproach());
+    },
+  };
+}
+
 /** Build labeled hit targets for the layout inspector (press X). */
 export function getInspectTargets(layout, state) {
   const targets = [];
-
-  const pushRect = (label, x, y, w, h, extra = "") => {
+  const push = (label, rect, extra = "") => {
     targets.push({
       label,
-      x,
-      y,
-      w,
-      h,
-      cx: Math.round(x + w / 2),
-      cy: Math.round(y + h / 2),
+      x: rect.x,
+      y: rect.y,
+      w: rect.w,
+      h: rect.h,
+      cx: Math.round(rect.x + rect.w / 2),
+      cy: Math.round(rect.y + rect.h / 2),
       extra,
     });
   };
 
-  const b = layout.building;
-  pushRect("Building", b.x, b.y, b.w, b.h);
+  push("Building", layout.building);
 
-  const lobby = layout.lobby;
-  pushRect("Lobby", lobby.x, lobby.y, lobby.w, lobby.h);
+  for (const area of layout.floor.areas) {
+    const room = area.roomId ? state.rooms[area.roomId - 1] : null;
+    const extra = room
+      ? `status: ${room.status}${room.unlocked ? "" : " (locked)"}`
+      : area.token
+        ? `permit: ${area.token}`
+        : "";
+    push(area.label, area.rect, extra);
+  }
 
-  const office = layout.office;
-  pushRect(
-    "Office",
-    office.x - office.w / 2,
-    office.y - office.h / 2,
-    office.w,
-    office.h,
-    `door (${Math.round(office.door.x)}, ${Math.round(office.door.y)})`
-  );
+  for (const room of layout.floor.rooms) {
+    push(
+      `Room ${room.id} doorway`,
+      { x: room.approach.x - 12, y: room.approach.y - 12, w: 24, h: 24 },
+      `approach (${Math.round(room.approach.x)}, ${Math.round(room.approach.y)})`
+    );
+  }
 
   const desk = layout.frontDesk;
-  pushRect(
-    "Front desk",
-    desk.x - desk.w / 2,
-    desk.y - desk.h / 2,
-    desk.w,
-    desk.h
+  push("Front desk", {
+    x: desk.x - desk.w / 2,
+    y: desk.y - desk.h / 2,
+    w: desk.w,
+    h: desk.h,
+  });
+  const deskApproach = layout.deskApproach();
+  push(
+    "Desk approach",
+    { x: deskApproach.x - 12, y: deskApproach.y - 12, w: 24, h: 24 },
+    `(${Math.round(deskApproach.x)}, ${Math.round(deskApproach.y)})`
   );
 
   if (layout.lobbyRadio) {
     const r = layout.lobbyRadio;
-    pushRect("Lobby radio", r.x - r.w / 2, r.y - r.h / 2, r.w, r.h);
+    push("Lobby radio", {
+      x: r.x - r.w / 2,
+      y: r.y - r.h / 2,
+      w: r.w,
+      h: r.h,
+    });
   }
   if (layout.newspaper) {
     const n = layout.newspaper;
-    pushRect("Newspaper stack", n.x - n.w / 2, n.y - n.h / 2, n.w, n.h);
+    push("Newspaper stack", {
+      x: n.x - n.w / 2,
+      y: n.y - n.h / 2,
+      w: n.w,
+      h: n.h,
+    });
   }
 
   const sign = layout.vacancySign;
-  pushRect(
-    "Vacancy sign",
-    sign.x - sign.w / 2,
-    sign.y - sign.h / 2,
-    sign.w,
-    sign.h
-  );
+  push("Vacancy sign", {
+    x: sign.x - sign.w / 2,
+    y: sign.y - sign.h / 2,
+    w: sign.w,
+    h: sign.h,
+  });
 
-  const bob = layout.handymanCloset;
-  pushRect("Bob's Closet", bob.x - bob.w / 2, bob.y - bob.h / 2, bob.w, bob.h);
-
-  const mary = layout.maidRoom;
-  pushRect("Mary's Maid Room", mary.x - mary.w / 2, mary.y - mary.h / 2, mary.w, mary.h);
-
-  for (let i = 0; i < layout.roomCenters.length; i++) {
-    const c = layout.roomCenters[i];
-    const room = state.rooms[i];
-    pushRect(
-      `Room ${i + 1}`,
-      c.x - CONFIG.roomWidth / 2,
-      c.y - CONFIG.roomHeight / 2,
-      CONFIG.roomWidth,
-      CONFIG.roomHeight,
-      room ? `status: ${room.status}` : ""
-    );
-  }
-
-  const wp = layout.waypoints;
-  const named = [
-    ["Lobby north-right door", wp.lobbyNorthDoor],
-    ["Lobby north-left door", wp.lobbyNorthLeftDoor],
-    ["Lobby west door", wp.lobbyWestDoor],
-    ["Lobby south-right door", wp.lobbySouthDoor],
-    ["Lobby south-left door", wp.lobbySouthLeftDoor],
-    ["Desk hall waypoint", wp.deskHallIdx],
-    ["Office door waypoint", wp.officeDoorIdx],
-    ["Bob home waypoint", wp.bobHomeIdx],
-    ["Mary home waypoint", wp.maryHomeIdx],
-  ];
-  for (const [label, idx] of named) {
-    if (idx == null || !wp.points[idx]) continue;
-    const p = wp.points[idx];
-    pushRect(label, p.x - 12, p.y - 12, 24, 24, `wp (${Math.round(p.x)}, ${Math.round(p.y)})`);
-  }
-
-  for (let i = 0; i < wp.doorIdx.length; i++) {
-    const p = wp.points[wp.doorIdx[i]];
-    if (!p) continue;
-    pushRect(
-      `Room ${i + 1} door`,
-      p.x - 12,
-      p.y - 12,
-      24,
-      24,
-      `wp (${Math.round(p.x)}, ${Math.round(p.y)})`
-    );
-  }
-
-  // Smaller targets first so hover prefers doors/waypoints over big rooms
+  // Smallest first so hovering prefers doorways over the rooms behind them.
   targets.sort((a, b) => a.w * a.h - b.w * b.h);
   return targets;
 }
@@ -197,9 +267,8 @@ export function drawInspectOverlay(ctx, layout, state, mouse, enabled) {
   ctx.fillStyle = "rgba(8, 12, 24, 0.2)";
   ctx.fillRect(0, 0, layout.width, layout.height);
 
-  // Light outlines for all targets
   for (const t of targets) {
-    ctx.strokeStyle = "rgba(255, 209, 102, 0.25)";
+    ctx.strokeStyle = "rgba(255, 209, 102, 0.22)";
     ctx.lineWidth = 1;
     ctx.strokeRect(t.x, t.y, t.w, t.h);
   }
@@ -221,7 +290,7 @@ export function drawInspectOverlay(ctx, layout, state, mouse, enabled) {
 
     const pad = 8;
     const lineH = 16;
-    const boxW = 260;
+    const boxW = 280;
     const boxH = pad * 2 + lines.length * lineH;
     let bx = (mouse?.x ?? hit.cx) + 14;
     let by = (mouse?.y ?? hit.cy) + 14;
@@ -251,356 +320,57 @@ export function drawInspectOverlay(ctx, layout, state, mouse, enabled) {
 
   ctx.fillStyle = "#ffd166";
   ctx.font = "bold 12px Segoe UI";
-  ctx.fillText("INSPECT (X) — hover an area", 12, 22);
+  ctx.fillText("INSPECT (X) — hover an area, click to log it", 12, 22);
   ctx.restore();
 }
 
-/**
- * Layout: upper/lower room wings, center lobby, office as its own room.
- * Everything is padded inside the building so rooms don't clip walls.
- */
-export function createLayout(canvas) {
-  const width = canvas.width;
-  const height = canvas.height;
-
-  const building = {
-    x: 48,
-    y: 40,
-    w: width - 96,
-    h: height - 108,
-  };
-
-  const cols = 4;
-  const hallGap = 56;
-  const lobbyHeight = 148;
-  const inset = 28;
-
-  // Staff closets sit on the bottom corners — rooms can use the full width.
-  const contentLeft = building.x + inset + 36;
-  const contentRight = building.x + building.w - inset - 36;
-  const gapX = (contentRight - contentLeft) / (cols - 1);
-
-  const roomH = CONFIG.roomHeight;
-  const gapY = roomH + hallGap;
-
-  // Vertical stack inside building: upper 2 rows → hall → lobby → hall → lower row
-  const upperStartY = building.y + inset + roomH / 2;
-  const upperBottom = upperStartY + gapY + roomH / 2;
-  const lobbyTop = upperBottom + hallGap;
-  const lobby = {
-    x: building.x + inset,
-    y: lobbyTop,
-    w: building.w - inset * 2,
-    h: lobbyHeight,
-  };
-  const lowerCenterY = lobby.y + lobby.h + hallGap + roomH / 2;
-
-  const roomCenters = [];
-  for (let i = 0; i < CONFIG.maxRooms; i++) {
-    const col = i % cols;
-    const row = Math.floor(i / cols);
-    const x = contentLeft + col * gapX;
-    if (row < 2) {
-      roomCenters.push({ x, y: upperStartY + row * gapY });
-    } else {
-      roomCenters.push({ x, y: lowerCenterY });
-    }
-  }
-
-  // Bottom corners (inspect picks): Mary left, Bob right
-  const handymanCloset = {
-    x: 1251,
-    y: 708,
-    w: 84,
-    h: 56,
-  };
-
-  const maidRoom = {
-    x: 96,
-    y: 717,
-    w: 84,
-    h: 56,
-  };
-
-  // Office is a real room on the left of the lobby (enter via east door only)
-  const office = {
-    x: lobby.x + 78,
-    y: lobby.y + lobby.h / 2,
-    w: 108,
-    h: lobby.h - 28,
-  };
-  office.door = {
-    x: office.x + office.w / 2 + 2,
-    y: office.y,
-  };
-
-  const frontDesk = {
-    x: lobby.x + lobby.w / 2 + 20,
-    y: lobby.y + lobby.h / 2,
-    w: 120,
-    h: 52,
-  };
-
-  const waypoints = buildHallwayWaypoints(
-    roomCenters,
-    handymanCloset,
-    maidRoom,
-    frontDesk,
-    lobby,
-    office
-  );
-
-  return {
-    width,
-    height,
-    roomCenters,
-    cols,
-    building,
-    lobby,
-    office,
-    frontDesk,
-    spawn: { x: frontDesk.x, y: frontDesk.y + 50 },
-    vacancySign: { x: width / 2, y: height - 28, w: 140, h: 36 },
-    lobbyRadio: {
-      x: frontDesk.x - 110,
-      y: frontDesk.y - 8,
-      w: 36,
-      h: 28,
-    },
-    newspaper: {
-      x: frontDesk.x - 38,
-      y: frontDesk.y + 4,
-      w: 28,
-      h: 18,
-    },
-    handymanCloset,
-    maidRoom,
-    waypoints,
-    checkInLineSlot(index) {
-      return {
-        x: frontDesk.x + 85 + index * 40,
-        y: frontDesk.y + 34,
-      };
-    },
-    checkoutLineSlot(index) {
-      return {
-        x: frontDesk.x - 55,
-        y: frontDesk.y + 52 + index * 28,
-      };
-    },
-    staffPaySlot(staffId) {
-      const offset = staffId === "mary" ? 48 : 18;
-      return {
-        x: frontDesk.x - 24 + offset,
-        y: frontDesk.y - 26,
-      };
-    },
-  };
-}
-
-function buildHallwayWaypoints(
-  roomCenters,
-  bobCloset,
-  maidRoom,
-  frontDesk,
-  lobby,
-  office
-) {
-  const points = [];
-  const add = (id, x, y) => {
-    points.push({ id, x, y, links: [] });
-    return points.length - 1;
-  };
-
-  const cols = 4;
-  const rows = Math.ceil(roomCenters.length / cols);
-  const doorClearance = CONFIG.roomHeight / 2 + 22;
-  const lobbyIn = 28; // step inside lobby before turning — avoids sliding on perimeter walls
-
-  const doorIdx = [];
-  const hallRowY = [];
-  for (let row = 0; row < rows; row++) {
-    // Upper rooms open south into the hall; lower rooms open north toward lobby
-    if (row >= 2) {
-      hallRowY[row] = roomCenters[row * cols].y - doorClearance;
-    } else {
-      hallRowY[row] = roomCenters[row * cols].y + doorClearance;
-    }
-  }
-
-  for (let i = 0; i < roomCenters.length; i++) {
-    const c = roomCenters[i];
-    const row = Math.floor(i / cols);
-    doorIdx.push(add(`door-${i + 1}`, c.x, hallRowY[row]));
-  }
-
-  // Hall rows: walk door-to-door along the corridor (direct route to assigned room)
-  for (let row = 0; row < rows; row++) {
-    for (let col = 0; col < cols - 1; col++) {
-      link(points, doorIdx[row * cols + col], doorIdx[row * cols + col + 1]);
-    }
-  }
-
-  // Spines in column gaps only — never outside the building or through room solids
-  const leftDoorX = lobby.x + 240;
-  const leftX = leftDoorX;
-  const rightX = (roomCenters[cols - 2].x + roomCenters[cols - 1].x) / 2;
-  const leftSpine = [];
-  const rightSpine = [];
-  for (let row = 0; row < rows; row++) {
-    leftSpine.push(add(`left-${row}`, leftX, hallRowY[row]));
-    rightSpine.push(add(`right-${row}`, rightX, hallRowY[row]));
-    // Link both neighboring columns to the gap spine
-    link(points, doorIdx[row * cols], leftSpine[row]);
-    link(points, doorIdx[row * cols + 1], leftSpine[row]);
-    link(points, doorIdx[row * cols + (cols - 2)], rightSpine[row]);
-    link(points, doorIdx[row * cols + (cols - 1)], rightSpine[row]);
-  }
-  // Upper wing vertical only (row0↔row1). Never bridge across the lobby body.
-  link(points, leftSpine[0], leftSpine[1]);
-  link(points, rightSpine[0], rightSpine[1]);
-
-  const last = rows - 1;
-
-  // Lobby perimeter doors — hall traffic only touches these, never mid-wall
-  const lobbyNorthDoor = add("lobby-n", rightX, lobby.y);
-  const lobbyNorthLeftDoor = add("lobby-n-left", leftDoorX, lobby.y);
-  const lobbyWestDoor = add(
-    "lobby-w",
-    lobby.x + lobby.w - 6,
-    lobby.y + lobby.h / 2
-  );
-  const lobbySouthDoor = add("lobby-s", rightX, lobby.y + lobby.h);
-  const lobbySouthLeftDoor = add("lobby-s-left", leftDoorX, lobby.y + lobby.h);
-
-  // Outside: hall spine → door on the perimeter
-  link(points, rightSpine[1], lobbyNorthDoor);
-  link(points, leftSpine[1], lobbyNorthLeftDoor);
-  link(points, rightSpine[last], lobbySouthDoor);
-  link(points, leftSpine[last], lobbySouthLeftDoor);
-
-  // Inside pads: must step into the lobby before turning toward the desk.
-  // Direct door→desk edges let axis-first steering slide along the north wall (~675,365).
-  const northInR = add("lobby-n-in", rightX, lobby.y + lobbyIn);
-  const northInL = add("lobby-n-left-in", leftDoorX, lobby.y + lobbyIn);
-  const southInR = add("lobby-s-in", rightX, lobby.y + lobby.h - lobbyIn);
-  const southInL = add("lobby-s-left-in", leftDoorX, lobby.y + lobby.h - lobbyIn);
-  const westIn = add(
-    "lobby-w-in",
-    lobby.x + lobby.w - 6 - lobbyIn,
-    lobby.y + lobby.h / 2
-  );
-
-  link(points, lobbyNorthDoor, northInR);
-  link(points, lobbyNorthLeftDoor, northInL);
-  link(points, lobbySouthDoor, southInR);
-  link(points, lobbySouthLeftDoor, southInL);
-  link(points, lobbyWestDoor, westIn);
-  // West door is inside-only. An outside "east-hall" spur used to sit in the
-  // few-pixel gap between lobby and building wall (~x 1302) and trapped staff.
-
-  const deskHallIdx = add("desk-hall", frontDesk.x, frontDesk.y + 36);
-  // Desk only connects to INSIDE pads — never to perimeter door nodes
-  link(points, northInR, deskHallIdx);
-  link(points, northInL, deskHallIdx);
-  link(points, southInR, deskHallIdx);
-  link(points, southInL, deskHallIdx);
-  link(points, westIn, deskHallIdx);
-  // Inside circulation (all fully inside the lobby band)
-  link(points, northInL, northInR);
-  link(points, southInL, southInR);
-  link(points, northInR, westIn);
-  link(points, southInR, westIn);
-  link(points, northInL, southInL);
-
-  // Staff homes at bottom corners — column-gap drop south of lower rooms, then
-  // along the south hall to a stand point just inside the building (not in the wall).
-  const belowLower =
-    roomCenters[last * cols].y + CONFIG.roomHeight / 2 + 22;
-  const rightBelow = add("right-below", rightX, belowLower);
-  const leftBelow = add("left-below", leftX, belowLower);
-  link(points, rightSpine[last], rightBelow);
-  link(points, leftSpine[last], leftBelow);
-  // Also reach south hall from the south lobby doors (short L, no wall gap)
-  link(points, lobbySouthDoor, rightBelow);
-  link(points, lobbySouthLeftDoor, leftBelow);
-
-  const bobStandX = Math.min(bobCloset.x - 36, roomCenters[cols - 1].x + 40);
-  const bobHomeIdx = add("bob-home", bobStandX, belowLower);
-  link(points, rightBelow, bobHomeIdx);
-
-  const maryStandX = Math.max(maidRoom.x + 36, leftX - 80);
-  const maryHomeIdx = add("mary-home", maryStandX, belowLower);
-  link(points, leftBelow, maryHomeIdx);
-
-  // Office door is only off the desk spur — not on the room↔lobby through-route
-  const officeDoorIdx = add("office-door", office.door.x + 16, office.door.y);
-  link(points, deskHallIdx, officeDoorIdx);
-
-  return {
-    points,
-    doorIdx,
-    bobHomeIdx,
-    maryHomeIdx,
-    deskHallIdx,
-    officeDoorIdx,
-    lobbyNorthDoor,
-    lobbyNorthLeftDoor,
-    lobbyWestDoor,
-    lobbySouthDoor,
-    lobbySouthLeftDoor,
-    hallRowY,
-  };
-}
-
-function link(points, a, b) {
-  if (a == null || b == null) return;
-  if (!points[a].links.includes(b)) points[a].links.push(b);
-  if (!points[b].links.includes(a)) points[b].links.push(a);
-}
+const COLORS = {
+  wall: "#39445c",
+  corridor: "#4f5d78",
+  lobbyFloor: "#6a5a48",
+  lobbyWall: "#8a7355",
+  doorway: "#c4a574",
+  officeFloor: "#3d4a63",
+  officeWall: "#9eb6e0",
+};
 
 export function drawWorld(ctx, state, layout, player, staffList = []) {
   ctx.clearRect(0, 0, layout.width, layout.height);
 
-  const building = layout.building;
-  const lobby = layout.lobby;
+  const { building, floor } = layout;
+  const tile = floor.tile;
+
   ctx.fillStyle = getFloorColor(state.hour);
   ctx.fillRect(0, 0, layout.width, layout.height);
 
-  ctx.fillStyle = "#3a455c";
+  ctx.fillStyle = COLORS.wall;
   ctx.fillRect(building.x, building.y, building.w, building.h);
   ctx.strokeStyle = "#243049";
   ctx.lineWidth = 3;
   ctx.strokeRect(building.x, building.y, building.w, building.h);
 
-  // Upper + lower hall carpets (everything except lobby band)
-  ctx.fillStyle = "#4f5d78";
-  const hallPad = 10;
-  ctx.fillRect(
-    building.x + hallPad,
-    building.y + hallPad,
-    building.w - hallPad * 2,
-    Math.max(8, lobby.y - building.y - hallPad)
-  );
-  const lowerHallY = lobby.y + lobby.h;
-  ctx.fillRect(
-    building.x + hallPad,
-    lowerHallY,
-    building.w - hallPad * 2,
-    Math.max(8, building.y + building.h - lowerHallY - hallPad)
-  );
+  // Circulation first, then the walled spaces that sit inside it.
+  for (const area of floor.areas) {
+    if (area.kind !== AREA.CORRIDOR) continue;
+    ctx.fillStyle = COLORS.corridor;
+    ctx.fillRect(area.rect.x, area.rect.y, area.rect.w, area.rect.h);
+  }
 
-  // Center lobby
-  ctx.fillStyle = "#6a5a48";
-  ctx.fillRect(lobby.x, lobby.y, lobby.w, lobby.h);
-  ctx.strokeStyle = "#8a7355";
-  ctx.lineWidth = 1;
-  ctx.strokeRect(lobby.x, lobby.y, lobby.w, lobby.h);
-  ctx.fillStyle = "#dbc5a2";
-  ctx.font = "bold 14px Segoe UI";
-  ctx.fillText("Lobby", lobby.x + lobby.w / 2 - 20, lobby.y + 20);
+  for (const area of floor.areas) {
+    if (area.kind === AREA.LOBBY) {
+      drawWalledArea(ctx, area, tile, COLORS.lobbyWall, COLORS.lobbyFloor);
+      ctx.fillStyle = "#dbc5a2";
+      ctx.font = "bold 14px Segoe UI";
+      ctx.fillText("Lobby", area.rect.x + 16, area.rect.y + 26);
+    } else if (area.kind === AREA.OFFICE) {
+      drawWalledArea(ctx, area, tile, COLORS.officeWall, COLORS.officeFloor);
+      drawOfficeFittings(ctx, area);
+    } else if (area.kind === AREA.DEPARTMENT) {
+      drawDepartment(ctx, area);
+    }
+  }
 
-  ctx.fillStyle = "rgba(219, 197, 162, 0.35)";
+  ctx.fillStyle = "rgba(219, 197, 162, 0.3)";
   for (let i = 0; i < CONFIG.maxWaitingGuests; i++) {
     const slot = layout.checkInLineSlot(i);
     ctx.beginPath();
@@ -608,90 +378,20 @@ export function drawWorld(ctx, state, layout, player, staffList = []) {
     ctx.fill();
   }
 
-  drawHandymanCloset(ctx, layout.handymanCloset);
-  drawMaidRoom(ctx, layout.maidRoom);
-
-  // Office room (solid) + east door into lobby
-  const office = layout.office;
-  const ox = office.x - office.w / 2;
-  const oy = office.y - office.h / 2;
-  ctx.fillStyle = "#3d4a63";
-  ctx.fillRect(ox, oy, office.w, office.h);
-  ctx.strokeStyle = "#9eb6e0";
-  ctx.lineWidth = 2;
-  ctx.strokeRect(ox, oy, office.w, office.h);
-  // Door opening on the east wall
-  ctx.fillStyle = "#6a5a48";
-  ctx.fillRect(ox + office.w - 3, office.y - 16, 6, 32);
-  ctx.fillStyle = "#c4a574";
-  ctx.fillRect(ox + office.w - 5, office.y - 14, 4, 28);
-  ctx.fillStyle = "#1a2030";
-  ctx.fillRect(office.x - 22, office.y - 22, 44, 30);
-  ctx.fillStyle = "#7dffb2";
-  ctx.fillRect(office.x - 18, office.y - 18, 36, 22);
-  ctx.fillStyle = "#dbc5a2";
-  ctx.font = "12px Segoe UI";
-  ctx.fillText("Office", office.x - 20, oy + 16);
-  ctx.fillText("PC", office.x - 10, office.y + 28);
-
-  // Lobby doors: north/south left+right, west-facing entry from right hall
-  drawLobbyDoorway(ctx, layout.waypoints.points[layout.waypoints.lobbyNorthDoor], "n");
-  drawLobbyDoorway(ctx, layout.waypoints.points[layout.waypoints.lobbyNorthLeftDoor], "n");
-  drawLobbyDoorway(ctx, layout.waypoints.points[layout.waypoints.lobbyWestDoor], "w");
-  drawLobbyDoorway(ctx, layout.waypoints.points[layout.waypoints.lobbySouthDoor], "s");
-  drawLobbyDoorway(ctx, layout.waypoints.points[layout.waypoints.lobbySouthLeftDoor], "s");
-
-  // Front desk — center of lobby
-  const desk = layout.frontDesk;
-  ctx.fillStyle = "#5a4030";
-  ctx.fillRect(desk.x - desk.w / 2, desk.y - desk.h / 2, desk.w, desk.h);
-  ctx.strokeStyle = "#3a2818";
-  ctx.lineWidth = 2;
-  ctx.strokeRect(desk.x - desk.w / 2, desk.y - desk.h / 2, desk.w, desk.h);
-  ctx.fillStyle = "#dbc5a2";
-  ctx.font = "13px Segoe UI";
-  ctx.fillText("Front desk", desk.x - 34, desk.y - desk.h / 2 - 8);
-
-  const radio = layout.lobbyRadio;
-  if (radio) {
-    ctx.fillStyle = "#2a2f3a";
-    ctx.fillRect(radio.x - radio.w / 2, radio.y - radio.h / 2, radio.w, radio.h);
-    ctx.strokeStyle = "#8d9bb5";
-    ctx.lineWidth = 1;
-    ctx.strokeRect(radio.x - radio.w / 2, radio.y - radio.h / 2, radio.w, radio.h);
-    ctx.fillStyle = "#c96545";
-    ctx.fillRect(radio.x - 10, radio.y - 4, 8, 5);
-    ctx.fillStyle = "#dbc5a2";
-    ctx.font = "9px Segoe UI";
-    ctx.fillText("Radio", radio.x - 14, radio.y + radio.h / 2 + 10);
+  const nextLocked = state.rooms.find((r) => !r.unlocked);
+  const nextPrice = nextLocked ? getRoomUnlockCost(state) : null;
+  for (const planned of floor.rooms) {
+    const room = state.rooms[planned.id - 1];
+    if (!room) continue;
+    const priceLabel =
+      nextLocked && nextLocked.id === room.id ? nextPrice : null;
+    drawRoom(ctx, room, planned, tile, priceLabel, state);
   }
 
-  const paper = layout.newspaper;
-  if (paper) {
-    ctx.fillStyle = "#d8c9a3";
-    ctx.fillRect(paper.x - paper.w / 2, paper.y - paper.h / 2, paper.w, paper.h);
-    ctx.strokeStyle = "#6a5a40";
-    ctx.strokeRect(paper.x - paper.w / 2, paper.y - paper.h / 2, paper.w, paper.h);
-    ctx.fillStyle = "#3a2818";
-    ctx.font = "8px Segoe UI";
-    ctx.fillText("Paper", paper.x - 12, paper.y + 3);
-  }
-
-  // Vacancy sign outside
-  const sign = layout.vacancySign;
-  const signOpen = state.vacancyOpen;
-  const signX = sign.x - sign.w / 2;
-  const signY = sign.y - sign.h / 2;
-  ctx.fillStyle = signOpen ? "#2f6b3a" : "#7a2e2e";
-  ctx.fillRect(signX, signY, sign.w, sign.h);
-  ctx.strokeStyle = "#101520";
-  ctx.lineWidth = 2;
-  ctx.strokeRect(signX, signY, sign.w, sign.h);
-  ctx.fillStyle = "#fff";
-  ctx.font = "bold 14px Segoe UI";
-  const signLabel = signOpen ? "VACANCY" : "NO VACANCY";
-  const labelW = ctx.measureText(signLabel).width;
-  ctx.fillText(signLabel, sign.x - labelW / 2, sign.y + 5);
+  drawFrontDesk(ctx, layout.frontDesk);
+  drawLobbyRadio(ctx, layout.lobbyRadio);
+  drawNewspaper(ctx, layout.newspaper);
+  drawVacancySign(ctx, layout.vacancySign, state.vacancyOpen);
 
   for (let i = 0; i < state.waitingGuests.length; i++) {
     const guest = state.waitingGuests[i];
@@ -721,45 +421,6 @@ export function drawWorld(ctx, state, layout, player, staffList = []) {
     drawCharacter(ctx, guest.x, guest.y, 11, color, label);
   }
 
-  const checkoutWaiting = state.activeGuests.some(
-    (g) => g.phase === "waiting_checkout"
-  );
-  const staffPayday = staffList.find(
-    (s) => s && (s.phase === "waiting_pay" || s.phase === "to_desk")
-  );
-  if (checkoutWaiting) {
-    ctx.fillStyle = "#ffd166";
-    ctx.font = "12px Segoe UI";
-    ctx.fillText("Press E to check out guests", 16, layout.height - 12);
-  } else if (staffPayday) {
-    ctx.fillStyle = "#ffd166";
-    ctx.font = "12px Segoe UI";
-    ctx.fillText(
-      `Press E to pay ${staffPayday.name} $${staffPayday.wagesOwed}`,
-      16,
-      layout.height - 12
-    );
-  } else if (state.waitingGuests.length > 0) {
-    ctx.fillStyle = "#ffd166";
-    ctx.font = "12px Segoe UI";
-    ctx.fillText("Press E to check in (they leave after 4h)", 16, layout.height - 12);
-  } else {
-    ctx.fillStyle = "#9aa8c0";
-    ctx.font = "11px Segoe UI";
-    ctx.fillText("E desk · E office PC · V sign", 16, layout.height - 12);
-  }
-
-  const nextLocked = state.rooms.find((r) => !r.unlocked);
-  const nextPrice = nextLocked ? getRoomUnlockCost(state) : null;
-
-  for (let i = 0; i < state.rooms.length; i++) {
-    const room = state.rooms[i];
-    const center = layout.roomCenters[i];
-    const priceLabel =
-      nextLocked && nextLocked.id === room.id ? nextPrice : null;
-    drawRoom(ctx, room, center, priceLabel, state);
-  }
-
   drawCharacter(ctx, player.x, player.y, player.radius, "#6ecbff", "You");
   for (const staff of staffList) {
     if (!staff) continue;
@@ -786,6 +447,8 @@ export function drawWorld(ctx, state, layout, player, staffList = []) {
     );
   }
 
+  drawHintLine(ctx, state, layout, staffList);
+
   const nightAlpha = getNightOverlay(state.hour);
   if (nightAlpha > 0) {
     ctx.fillStyle = `rgba(8, 12, 28, ${nightAlpha})`;
@@ -804,24 +467,167 @@ export function drawWorld(ctx, state, layout, player, staffList = []) {
   }
 }
 
-function drawRoom(ctx, room, center, unlockCost = null, state = null) {
-  const w = CONFIG.roomWidth;
-  const h = CONFIG.roomHeight;
-  const x = center.x - w / 2;
-  const y = center.y - h / 2;
+/**
+ * Walls are drawn exactly where the nav grid puts them: a one-tile ring with
+ * the door openings cut back out, so what you see is what characters path on.
+ */
+function drawWalledArea(ctx, area, tile, wallColor, floorColor) {
+  const r = area.rect;
+  ctx.fillStyle = wallColor;
+  ctx.fillRect(r.x, r.y, r.w, r.h);
+  ctx.fillStyle = floorColor;
+  ctx.fillRect(r.x + tile, r.y + tile, r.w - tile * 2, r.h - tile * 2);
+  for (const door of area.doors ?? []) {
+    drawDoorGap(ctx, area, door, tile);
+  }
+}
+
+function drawDoorGap(ctx, area, door, tile) {
+  const r = area.rect;
+  ctx.fillStyle = COLORS.doorway;
+  if (door.side === "north" || door.side === "south") {
+    const x = door.center.x - door.width / 2;
+    const y = door.side === "north" ? r.y : r.y + r.h - tile;
+    ctx.fillRect(x, y, door.width, tile);
+    return;
+  }
+  const y = door.center.y - door.width / 2;
+  const x = door.side === "west" ? r.x : r.x + r.w - tile;
+  ctx.fillRect(x, y, tile, door.width);
+}
+
+function drawOfficeFittings(ctx, area) {
+  const center = {
+    x: area.rect.x + area.rect.w / 2,
+    y: area.rect.y + area.rect.h / 2,
+  };
+  ctx.fillStyle = "#1a2030";
+  ctx.fillRect(center.x - 24, center.y - 20, 48, 32);
+  ctx.fillStyle = "#7dffb2";
+  ctx.fillRect(center.x - 20, center.y - 16, 40, 24);
+  ctx.fillStyle = "#dbc5a2";
+  ctx.font = "12px Segoe UI";
+  ctx.fillText("Office", area.rect.x + 16, area.rect.y + 26);
+  ctx.font = "10px Segoe UI";
+  ctx.fillText("PC", center.x - 7, center.y + 26);
+}
+
+function drawDepartment(ctx, area) {
+  const r = area.rect;
+  ctx.fillStyle = "#4a3f52";
+  ctx.fillRect(r.x, r.y, r.w, r.h);
+  ctx.strokeStyle = area.accent ?? "#9aa8c0";
+  ctx.lineWidth = 2;
+  ctx.strokeRect(r.x, r.y, r.w, r.h);
+  ctx.fillStyle = area.accent ?? "#e8edf5";
+  ctx.font = "bold 11px Segoe UI";
+  ctx.fillText(area.label, r.x + 10, r.y + 20);
+}
+
+function drawFrontDesk(ctx, desk) {
+  const x = desk.x - desk.w / 2;
+  const y = desk.y - desk.h / 2;
+  ctx.fillStyle = "#5a4030";
+  ctx.fillRect(x, y, desk.w, desk.h);
+  ctx.strokeStyle = "#3a2818";
+  ctx.lineWidth = 2;
+  ctx.strokeRect(x, y, desk.w, desk.h);
+  ctx.fillStyle = "#dbc5a2";
+  ctx.font = "13px Segoe UI";
+  ctx.fillText("Front desk", desk.x - 34, y - 8);
+}
+
+function drawLobbyRadio(ctx, radio) {
+  if (!radio) return;
+  ctx.fillStyle = "#2a2f3a";
+  ctx.fillRect(radio.x - radio.w / 2, radio.y - radio.h / 2, radio.w, radio.h);
+  ctx.strokeStyle = "#8d9bb5";
+  ctx.lineWidth = 1;
+  ctx.strokeRect(radio.x - radio.w / 2, radio.y - radio.h / 2, radio.w, radio.h);
+  ctx.fillStyle = "#c96545";
+  ctx.fillRect(radio.x - 10, radio.y - 4, 8, 5);
+  ctx.fillStyle = "#dbc5a2";
+  ctx.font = "9px Segoe UI";
+  ctx.fillText("Radio", radio.x - 14, radio.y + radio.h / 2 + 10);
+}
+
+function drawNewspaper(ctx, paper) {
+  if (!paper) return;
+  ctx.fillStyle = "#d8c9a3";
+  ctx.fillRect(paper.x - paper.w / 2, paper.y - paper.h / 2, paper.w, paper.h);
+  ctx.strokeStyle = "#6a5a40";
+  ctx.strokeRect(paper.x - paper.w / 2, paper.y - paper.h / 2, paper.w, paper.h);
+  ctx.fillStyle = "#3a2818";
+  ctx.font = "8px Segoe UI";
+  ctx.fillText("Paper", paper.x - 12, paper.y + 3);
+}
+
+function drawVacancySign(ctx, sign, open) {
+  const x = sign.x - sign.w / 2;
+  const y = sign.y - sign.h / 2;
+  ctx.fillStyle = open ? "#2f6b3a" : "#7a2e2e";
+  ctx.fillRect(x, y, sign.w, sign.h);
+  ctx.strokeStyle = "#101520";
+  ctx.lineWidth = 2;
+  ctx.strokeRect(x, y, sign.w, sign.h);
+  ctx.fillStyle = "#fff";
+  ctx.font = "bold 14px Segoe UI";
+  const label = open ? "VACANCY" : "NO VACANCY";
+  const labelW = ctx.measureText(label).width;
+  ctx.fillText(label, sign.x - labelW / 2, sign.y + 5);
+}
+
+function drawHintLine(ctx, state, layout, staffList) {
+  const checkoutWaiting = state.activeGuests.some(
+    (g) => g.phase === "waiting_checkout"
+  );
+  const staffPayday = staffList.find(
+    (s) => s && (s.phase === "waiting_pay" || s.phase === "to_desk")
+  );
+
+  ctx.font = "12px Segoe UI";
+  if (checkoutWaiting) {
+    ctx.fillStyle = "#ffd166";
+    ctx.fillText("Press E to check out guests", 16, layout.height - 12);
+  } else if (staffPayday) {
+    ctx.fillStyle = "#ffd166";
+    ctx.fillText(
+      `Press E to pay ${staffPayday.name} $${staffPayday.wagesOwed}`,
+      16,
+      layout.height - 12
+    );
+  } else if (state.waitingGuests.length > 0) {
+    ctx.fillStyle = "#ffd166";
+    ctx.fillText("Press E to review the arrival at the desk", 16, layout.height - 12);
+  } else {
+    ctx.fillStyle = "#9aa8c0";
+    ctx.font = "11px Segoe UI";
+    ctx.fillText("E desk · E radio / paper · E office PC · V sign · X inspect · R barricade", 16, layout.height - 12);
+  }
+}
+
+function drawRoom(ctx, room, planned, tile, unlockCost = null, state = null) {
+  const r = planned.rect;
+  const inner = {
+    x: r.x + tile,
+    y: r.y + tile,
+    w: r.w - tile * 2,
+    h: r.h - tile * 2,
+  };
+
+  ctx.fillStyle = COLORS.wall;
+  ctx.fillRect(r.x, r.y, r.w, r.h);
 
   if (!room.unlocked) {
     ctx.fillStyle = "#2a3142";
-    ctx.fillRect(x, y, w, h);
-    ctx.strokeStyle = "#1f2635";
-    ctx.strokeRect(x, y, w, h);
+    ctx.fillRect(inner.x, inner.y, inner.w, inner.h);
     ctx.fillStyle = "#6a738a";
     ctx.font = "11px Segoe UI";
-    ctx.fillText(`Room ${room.id}`, x + 28, center.y - 4);
-    ctx.fillText("LOCKED", x + 30, center.y + 12);
+    ctx.fillText(`Room ${room.id}`, inner.x + 6, inner.y + 22);
+    ctx.fillText("LOCKED", inner.x + 6, inner.y + 38);
     if (unlockCost != null) {
       ctx.fillStyle = "#ffd166";
-      ctx.fillText(`$${unlockCost}`, x + 34, center.y + 28);
+      ctx.fillText(`$${unlockCost}`, inner.x + 6, inner.y + 54);
     }
     return;
   }
@@ -833,43 +639,47 @@ function drawRoom(ctx, room, center, unlockCost = null, state = null) {
     needs_inspection: "#e6b422",
     needs_repair: "#c45c2a",
   };
-
   ctx.fillStyle = colors[room.status] || "#888";
-  ctx.fillRect(x, y, w, h);
-  ctx.strokeStyle = room.status === "occupied" ? "#1a2030" : "#c8d6ea";
-  ctx.lineWidth = room.status === "occupied" ? 3 : 2;
-  ctx.strokeRect(x, y, w, h);
+  ctx.fillRect(inner.x, inner.y, inner.w, inner.h);
 
-  // Door on the hall-facing side (south for upper wing, north for lower wing)
-  const doorSouth = room.id <= 8;
-  drawRoomDoor(ctx, x, y, w, h, doorSouth);
-
-  if (room.status === "occupied") {
-    ctx.fillStyle = "#ff8f8f";
-    ctx.font = "9px Segoe UI";
-    ctx.fillText("DO NOT DISTURB", x + 10, doorSouth ? y + 50 : y + h - 14);
-  }
+  drawDoorGap(ctx, { rect: r }, planned.doorOpening, tile);
 
   ctx.fillStyle = "#101520";
   ctx.font = "bold 12px Segoe UI";
-  ctx.fillText(`Room ${room.id}`, x + 26, y + 18);
+  ctx.fillText(`Room ${room.id}`, inner.x + 6, inner.y + 18);
 
-  ctx.font = "10px Segoe UI";
-  ctx.fillText(roomStatusLabel(room, state), x + 8, y + 36);
+  ctx.font = "9px Segoe UI";
+  ctx.fillText(roomStatusLabel(room, state), inner.x + 6, inner.y + 34);
+
+  if (room.status === "occupied") {
+    ctx.fillStyle = "#ff8f8f";
+    ctx.font = "8px Segoe UI";
+    ctx.fillText("DO NOT DISTURB", inner.x + 6, inner.y + 48);
+  }
 
   if (room.worker) {
     ctx.fillStyle = "#fff";
-    ctx.fillText(`Working: ${room.worker}`, x + 8, y + 50);
+    ctx.font = "9px Segoe UI";
+    ctx.fillText(`Working: ${room.worker}`, inner.x + 6, inner.y + inner.h - 14);
   }
 
-  if (room.status === "dirty" && room.cleanProgress > 0) {
-    drawProgressBar(ctx, x + 8, y + h - 10, w - 16, room.cleanProgress, "#aaf0c8");
-  }
-  if (room.status === "needs_inspection" && room.inspectProgress > 0) {
-    drawProgressBar(ctx, x + 8, y + h - 10, w - 16, room.inspectProgress, "#ffe08a");
-  }
-  if (room.status === "needs_repair" && room.repairProgress > 0) {
-    drawProgressBar(ctx, x + 8, y + h - 10, w - 16, room.repairProgress, "#ffb080");
+  const progress =
+    room.status === "dirty"
+      ? { value: room.cleanProgress, color: "#aaf0c8" }
+      : room.status === "needs_inspection"
+        ? { value: room.inspectProgress, color: "#ffe08a" }
+        : room.status === "needs_repair"
+          ? { value: room.repairProgress, color: "#ffb080" }
+          : null;
+  if (progress && progress.value > 0) {
+    drawProgressBar(
+      ctx,
+      inner.x + 4,
+      inner.y + inner.h - 8,
+      inner.w - 8,
+      progress.value,
+      progress.color
+    );
   }
 }
 
@@ -881,31 +691,22 @@ function dirtColor(level) {
 
 function roomStatusLabel(room, state = null) {
   if (room.status === "clean") return "Vacant";
-  if (room.status === "needs_inspection") return "Inspect checkout";
+  if (room.status === "needs_inspection") return "Inspect";
   if (room.status === "needs_repair") {
     const hrs = CONFIG.repairHours[room.repairLevel];
     const cost =
-      room.repairCost ||
-      (state ? getRepairCost(state, room.repairLevel) : null);
-    const costLabel = cost != null ? `, $${cost}` : "";
-    return `Repair: ${room.repairLevel} (${hrs}h${costLabel})`;
+      room.repairCost || (state ? getRepairCost(state, room.repairLevel) : null);
+    const costLabel = cost != null ? ` $${cost}` : "";
+    return `Fix ${room.repairLevel} (${hrs}h${costLabel})`;
   }
   if (room.status === "dirty") {
-    const dirt = `Dirt: ${room.dirtLevel} (${CONFIG.dirtHours[room.dirtLevel]}h)`;
-    if (room.damageFound && room.repairLevel) {
-      return `${dirt} → repair`;
-    }
-    return dirt;
+    const dirt = `Dirt ${room.dirtLevel} (${CONFIG.dirtHours[room.dirtLevel]}h)`;
+    return room.damageFound && room.repairLevel ? `${dirt} →fix` : dirt;
   }
   if (room.status === "occupied") {
     const hoursLeft = Math.max(0, room.stayRemainingHours || 0);
-    const daysLeft = Math.max(
-      0,
-      Math.ceil(hoursLeft / CONFIG.stayIntervalHours)
-    );
-    return room.guestName
-      ? `${room.guestName} (${daysLeft}d/${Math.ceil(hoursLeft)}h)`
-      : "Occupied";
+    const daysLeft = Math.max(0, Math.ceil(hoursLeft / CONFIG.stayIntervalHours));
+    return room.guestName ? `${room.guestName} ${daysLeft}d` : "Occupied";
   }
   return room.status;
 }
@@ -932,87 +733,17 @@ function drawProgressBar(ctx, x, y, width, progress, color) {
   ctx.fillRect(x, y, width * Math.min(1, Math.max(0, progress)), 6);
 }
 
-function drawRoomDoor(ctx, x, y, w, h, facesSouth) {
-  const doorW = 28;
-  const doorH = 8;
-  const dx = x + w / 2 - doorW / 2;
-  const dy = facesSouth ? y + h - doorH : y;
-  // Cut a doorway into the wall color
-  ctx.fillStyle = "#4f5d78";
-  ctx.fillRect(dx, dy, doorW, doorH);
-  ctx.fillStyle = "#c4a574";
-  ctx.fillRect(dx + 2, dy + 1, doorW - 4, doorH - 2);
-  ctx.strokeStyle = "#3a2818";
-  ctx.lineWidth = 1;
-  ctx.strokeRect(dx + 2, dy + 1, doorW - 4, doorH - 2);
-}
-
-function drawLobbyDoorway(ctx, point, facing) {
-  if (!point) return;
-  if (facing === "w") {
-    const w = 10;
-    const h = 36;
-    const x = point.x - w + 2;
-    const y = point.y - h / 2;
-    ctx.fillStyle = "#4f5d78";
-    ctx.fillRect(x, y, w, h);
-    ctx.fillStyle = "#dbc5a2";
-    ctx.fillRect(x + 2, y + 3, w - 4, h - 6);
-    ctx.strokeStyle = "#3a2818";
-    ctx.strokeRect(x + 2, y + 3, w - 4, h - 6);
-    return;
-  }
-  const w = 36;
-  const h = 10;
-  const x = point.x - w / 2;
-  const y = facing === "n" ? point.y - 2 : point.y - h + 2;
-  ctx.fillStyle = "#4f5d78";
-  ctx.fillRect(x, y, w, h);
-  ctx.fillStyle = "#dbc5a2";
-  ctx.fillRect(x + 3, y + 2, w - 6, h - 4);
-  ctx.strokeStyle = "#3a2818";
-  ctx.strokeRect(x + 3, y + 2, w - 6, h - 4);
-}
-
-function drawHandymanCloset(ctx, closet) {
-  const x = closet.x - closet.w / 2;
-  const y = closet.y - closet.h / 2;
-  ctx.fillStyle = "#5a4a3a";
-  ctx.fillRect(x, y, closet.w, closet.h);
-  ctx.strokeStyle = "#ffb347";
-  ctx.lineWidth = 2;
-  ctx.strokeRect(x, y, closet.w, closet.h);
-  ctx.fillStyle = "#ffd9a0";
-  ctx.font = "10px Segoe UI";
-  ctx.fillText("Bob's", x + 22, y + 24);
-  ctx.fillText("Closet", x + 18, y + 38);
-}
-
-function drawMaidRoom(ctx, room) {
-  const x = room.x - room.w / 2;
-  const y = room.y - room.h / 2;
-  ctx.fillStyle = "#4a3a4a";
-  ctx.fillRect(x, y, room.w, room.h);
-  ctx.strokeStyle = "#e8a0bf";
-  ctx.lineWidth = 2;
-  ctx.strokeRect(x, y, room.w, room.h);
-  ctx.fillStyle = "#f5c6d8";
-  ctx.font = "10px Segoe UI";
-  ctx.fillText("Mary's", x + 18, y + 24);
-  ctx.fillText("Maid Rm", x + 12, y + 38);
-}
-
 function getFloorColor(hour) {
   const h = ((hour % 24) + 24) % 24;
   if (h >= 5 && h < 8) return "#3a4258";
   if (h >= 8 && h < 17) return "#2f384c";
-  if (h >= 17 && h < 20) return "#2a3148";
-  return "#1e2538";
+  if (h >= 17 && h < 21) return "#33334f";
+  return "#1b2133";
 }
 
 function getNightOverlay(hour) {
   const h = ((hour % 24) + 24) % 24;
-  if (h >= 21 || h < 5) return 0.45;
-  if (h >= 20 || h < 6) return 0.25;
+  if (h >= 21 || h < 5) return 0.35;
+  if (h >= 19) return 0.18;
   return 0;
 }

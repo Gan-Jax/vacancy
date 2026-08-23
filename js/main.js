@@ -96,8 +96,8 @@ const pcPendingEl = document.getElementById("pc-pending");
 const pcOrderTotalEl = document.getElementById("pc-order-total");
 const pcPlaceOrderBtn = document.getElementById("pc-place-order");
 
-const state = createInitialState();
 const layout = createLayout(canvas);
+const state = createInitialState(layout.roomCount);
 const input = createInput();
 const player = new Player(layout.spawn.x + 40, layout.spawn.y);
 let bob = null;
@@ -170,7 +170,7 @@ hireBobBtn.addEventListener("click", () => {
       name: "Bob",
       role: "repair",
       color: "#ffb347",
-      homeKey: "bobHomeIdx",
+      department: "maintenance",
     });
   }
   markUIDirty();
@@ -184,7 +184,7 @@ hireMaryBtn.addEventListener("click", () => {
       name: "Mary",
       role: "housekeeping",
       color: "#e8a0bf",
-      homeKey: "maryHomeIdx",
+      department: "housekeeping",
     });
   }
   markUIDirty();
@@ -806,6 +806,19 @@ window.game = {
     return [bob, mary].filter(Boolean);
   },
 };
+
+const layoutProblems = layout.validate();
+if (layoutProblems.length) {
+  console.warn("[floorplan] unwalkable areas:", layoutProblems);
+  for (const problem of layoutProblems.slice(0, 5)) {
+    addLog(state, `Layout problem: ${problem}`);
+  }
+} else {
+  addLog(
+    state,
+    `${layout.floor.name}: ${layout.roomCount} rooms, every door reachable.`
+  );
+}
 
 refreshUI(true);
 requestAnimationFrame(gameLoop);

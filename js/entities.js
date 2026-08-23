@@ -15,7 +15,6 @@ import {
   followPath,
   getRoomRect,
   isRoomBlocking,
-  nearestDoorIndex,
   pathToDeskHall,
   resolveRoomCollision,
   steerTo,
@@ -94,7 +93,7 @@ export class Player {
   getInteractTarget(rooms, layout, staffList = [], deskQueue = false) {
     let best = null;
     let bestDist = Infinity;
-    const interactRange = 72;
+    const interactRange = 88;
 
     const radio = layout.lobbyRadio;
     if (radio) {
@@ -173,14 +172,14 @@ export class Player {
 
 /** Staff NPC — hallway pathfinding + personal home base + weekly payday. */
 export class StaffNPC {
-  constructor(homeSpot, profile, homeIdx) {
+  constructor(profile, home) {
     this.id = profile.id;
     this.name = profile.name;
     this.role = profile.role;
     this.color = profile.color;
-    this.homeIdx = homeIdx;
-    this.x = homeSpot.x - 10;
-    this.y = homeSpot.y;
+    this.department = profile.department ?? null;
+    this.x = home.x;
+    this.y = home.y;
     this.radius = 12;
     this.activeTask = null;
     this.targetRoom = null;
@@ -197,22 +196,17 @@ export class StaffNPC {
   }
 
   static spawnAtHome(layout, profile) {
-    const homeIdx = layout.waypoints[profile.homeKey];
-    const homePoint = layout.waypoints.points[homeIdx];
-    const visual =
-      profile.homeKey === "maryHomeIdx" ? layout.maidRoom : layout.handymanCloset;
-    const npc = new StaffNPC(visual, profile, homeIdx);
-    npc.x = homePoint.x;
-    npc.y = homePoint.y;
-    return npc;
+    return new StaffNPC(profile, layout.staffHome(profile.department ?? profile.id));
   }
 
   homePoint(layout) {
-    return layout.waypoints.points[this.homeIdx];
+    return layout.staffHome(this.department ?? this.id);
   }
 
   pathHome(layout) {
-    return findPath(layout, this.x, this.y, this.homeIdx);
+    return findPath(layout, this.x, this.y, this.homePoint(layout), {
+      radius: this.radius,
+    });
   }
 
   paySlot(layout) {
@@ -255,7 +249,7 @@ export class StaffNPC {
 
   beginPaydayTrip(layout) {
     this.targetRoom = null;
-    this.path = pathToDeskHall(layout, this.x, this.y);
+    this.path = pathToDeskHall(layout, this.x, this.y, { radius: this.radius });
     this.phase = "to_desk";
   }
 
@@ -265,24 +259,6 @@ export class StaffNPC {
     const speed = CONFIG.npcMoveSpeed;
 
     resolveRoomCollision(this, rooms, layout, allowId);
-
-    // Don't snap while heading home / desk — old closet sat above the hall.
-    if (
-      allowId == null &&
-      this.phase !== "to_closet" &&
-      this.phase !== "to_desk" &&
-      this.phase !== "waiting_pay" &&
-      layout.waypoints.hallRowY
-    ) {
-      const topHall = layout.waypoints.hallRowY[0];
-      if (this.y < topHall - 8) {
-        const doorIdx = nearestDoorIndex(layout, this.x, this.y);
-        const door = layout.waypoints.points[doorIdx];
-        this.x = door.x;
-        this.y = door.y;
-        this.path = [];
-      }
-    }
 
     if (this.activeTask) {
       this.phase = "working";
@@ -315,7 +291,9 @@ export class StaffNPC {
 
     if (this.phase === "to_desk") {
       if (!this.path.length) {
-        this.path = pathToDeskHall(layout, this.x, this.y);
+        this.path = pathToDeskHall(layout, this.x, this.y, {
+          radius: this.radius,
+        });
       }
       const atHall = followPath(this, dt, rooms, layout, null, speed);
       const slot = this.paySlot(layout);
@@ -354,8 +332,7 @@ export class StaffNPC {
     }
 
     if (this.phase === "exit_room" && this.exitRoomId != null) {
-      const door =
-        layout.waypoints.points[layout.waypoints.doorIdx[this.exitRoomId - 1]];
+      const door = layout.roomDoor(this.exitRoomId);
       const dist = Math.hypot(this.x - door.x, this.y - door.y);
       steerTo(this, door.x, door.y, dt, rooms, layout, this.exitRoomId, speed);
       if (dist < 16) {
@@ -383,8 +360,13 @@ export class StaffNPC {
       this.targetRoom = pickJobRoom(state.rooms, this.role, state);
       if (this.targetRoom) {
         this.phase = "to_door";
-        const doorIdx = layout.waypoints.doorIdx[this.targetRoom.id - 1];
-        this.path = findPath(layout, this.x, this.y, doorIdx);
+        this.path = findPath(
+          layout,
+          this.x,
+          this.y,
+          layout.roomDoor(this.targetRoom.id),
+          { radius: this.radius }
+        );
       } else if (this.phase !== "idle" && this.phase !== "to_closet") {
         this.phase = "to_closet";
         this.path = this.pathHome(layout);
@@ -411,8 +393,13 @@ export class StaffNPC {
 
     if (this.phase === "to_door") {
       if (!this.path.length) {
-        const doorIdx = layout.waypoints.doorIdx[this.targetRoom.id - 1];
-        this.path = findPath(layout, this.x, this.y, doorIdx);
+        this.path = findPath(
+          layout,
+          this.x,
+          this.y,
+          layout.roomDoor(this.targetRoom.id),
+          { radius: this.radius }
+        );
       }
       const atDoor = followPath(this, dt, rooms, layout, null, speed);
       if (atDoor) {
