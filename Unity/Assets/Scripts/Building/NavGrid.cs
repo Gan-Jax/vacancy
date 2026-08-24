@@ -69,6 +69,8 @@ namespace Vacancy
                 foreach (var door in area.Doors) CarveDoor(grid, area, door);
             }
 
+            if (level >= 0) SealEnvelope(grid, floor);
+
             grid.Clearance = ComputeClearance(grid);
             return grid;
         }
@@ -156,6 +158,32 @@ namespace Vacancy
                         grid.Owner[i] = area.Token;
                     }
                 }
+            }
+        }
+
+        static void SealEnvelope(NavGrid grid, BuiltFloor floor)
+        {
+            var content = floor.Content;
+            if (content.W <= 0f || content.H <= 0f) return;
+
+            AreaCellRange(grid, content, out int c0, out int r0, out int c1, out int r1);
+
+            void Block(int col, int row)
+            {
+                if (col < 0 || row < 0 || col >= grid.Cols || row >= grid.Rows) return;
+                int i = row * grid.Cols + col;
+                grid.Blocked[i] = 1;
+                grid.Owner[i] = null;
+            }
+
+            // North, west, and east walls turn the room-wing halls into indoor
+            // space. Leave the south open so the lot still meets the service
+            // corridor and lobby doors.
+            for (int col = c0; col <= c1; col++) Block(col, r0);
+            for (int row = r0; row <= r1; row++)
+            {
+                Block(c0, row);
+                Block(c1, row);
             }
         }
 

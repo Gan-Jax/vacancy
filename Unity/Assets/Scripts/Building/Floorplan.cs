@@ -131,10 +131,12 @@ namespace Vacancy
             MaxRoomsPerRow = 6,
             Bands = new List<BandSpec>
             {
-                new BandSpec { Kind = "rooms", DoorSide = "south" },
-                new BandSpec { Kind = "corridor", Height = 40 },
+                // Exterior halls wrap the guest-room block so doors open onto
+                // indoor corridors, not the lot. Room rows sit back-to-back.
+                new BandSpec { Kind = "corridor", Height = 60 },
                 new BandSpec { Kind = "rooms", DoorSide = "north" },
-                new BandSpec { Kind = "corridor", Height = 40 },
+                new BandSpec { Kind = "rooms", DoorSide = "south" },
+                new BandSpec { Kind = "corridor", Height = 60 },
                 new BandSpec { Kind = "lobby", Height = 280, Grow = true },
                 new BandSpec { Kind = "service", Height = 90 }
             }

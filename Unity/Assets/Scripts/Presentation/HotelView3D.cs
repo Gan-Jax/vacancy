@@ -148,7 +148,10 @@ namespace Vacancy
             // filled the stair well with a solid slab, so the steps vanished.
             SlabWithHole("Lot", lotRect, layout.Building, 0.02f, 0.04f, Palette.FloorColor(8), false);
             var well = Pad(layout.Stairs, 4f);
-            SlabWithHole("BuildingFloor", layout.Building, well, 0.03f, 0.06f, Palette.Corridor);
+            var indoor = layout.Floor.Content;
+            // Edge strip stays outside the hallway walls as a foundation/eave.
+            SlabWithHole("Foundation", layout.Building, indoor, 0.025f, 0.05f, Palette.Hex("#3a3d42"), false);
+            SlabWithHole("BuildingFloor", indoor, well, 0.03f, 0.06f, Palette.Corridor);
             SlabWithHole("Ceiling", layout.Building, well, WorldScale.CeilingY, 0.08f, Palette.Hex("#1a2030"));
             if (layout.Basement.W > 0)
             {
@@ -170,6 +173,7 @@ namespace Vacancy
                 if (area.Kind == AreaKind.Corridor)
                 {
                     Box(area.Id, area.Rect, 0.05f, 0.08f, Palette.Corridor);
+                    HallRunner(area);
                 }
                 else if (area.Kind == AreaKind.Lobby)
                 {
@@ -216,6 +220,7 @@ namespace Vacancy
                     Palette.Hex("#3a455c"));
             }
 
+            BuildHallwayEnvelope();
             BuildBasement();
         }
 
@@ -470,17 +475,31 @@ namespace Vacancy
             int corridorLights = 0;
             foreach (var area in layout.Floor.Areas)
             {
-                if (area.Kind != AreaKind.Corridor) continue;
-                if (corridorLights >= 6) break;
-                PointLight(
-                    $"CorridorLight-{corridorLights}",
-                    area.Rect.Center.X,
-                    area.Rect.Center.Y,
-                    2.35f,
-                    11f,
-                    1.05f,
-                    new Color(0.75f, 0.85f, 1f));
-                corridorLights++;
+                if (area.Kind != AreaKind.Corridor || area.Level < 0) continue;
+                if (area.Rect.W < 80f && area.Rect.H < 80f) continue;
+                bool eastWest = area.Rect.W >= area.Rect.H * 1.5f;
+                int lamps = eastWest
+                    ? Mathf.Clamp(Mathf.RoundToInt(area.Rect.W / 220f), 1, 4)
+                    : 1;
+                for (int i = 0; i < lamps && corridorLights < 14; i++)
+                {
+                    float t = lamps == 1 ? 0.5f : (i + 1f) / (lamps + 1f);
+                    float lx = eastWest
+                        ? area.Rect.X + area.Rect.W * t
+                        : area.Rect.Center.X;
+                    float ly = eastWest
+                        ? area.Rect.Center.Y
+                        : area.Rect.Y + area.Rect.H * t;
+                    PointLight(
+                        $"CorridorLight-{corridorLights}",
+                        lx,
+                        ly,
+                        2.35f,
+                        11f,
+                        1.05f,
+                        new Color(0.75f, 0.85f, 1f));
+                    corridorLights++;
+                }
             }
         }
 
@@ -624,6 +643,31 @@ namespace Vacancy
                     view.Label.transform.rotation = Quaternion.LookRotation(toCam);
                 }
             }
+        }
+
+        void HallRunner(FloorArea area)
+        {
+            var rect = area.Rect;
+            if (rect.W < 80f || rect.H < 36f) return;
+            if (rect.H > 120f && rect.H > rect.W) return;
+            float padX = Mathf.Min(16f, rect.W * 0.08f);
+            float padY = rect.H * 0.28f;
+            Box(
+                area.Id + "-runner",
+                new Rect(rect.X + padX, rect.Y + padY, rect.W - padX * 2f, rect.H - padY * 2f),
+                0.062f,
+                0.02f,
+                Palette.Hex("#3a455c"));
+        }
+
+        void BuildHallwayEnvelope()
+        {
+            var content = layout.Floor.Content;
+            if (content.W <= 0f || content.H <= 0f) return;
+            var color = Palette.Hex("#2c3348");
+            AddSide("Envelope-N", "north", content, null, color, 0f);
+            AddSide("Envelope-W", "west", content, null, color, 0f);
+            AddSide("Envelope-E", "east", content, null, color, 0f);
         }
 
         void Walls(string name, Rect rect, List<Door> doors, Color color, float yBottom = 0f, string skipSide = null)
