@@ -391,12 +391,20 @@ namespace Vacancy
 
         public Point CheckoutLineSlot(int index)
         {
-            const int perRow = 8;
+            const int perRow = 4;
             int col = index % perRow;
-            int row = System.Math.Min(1, index / perRow);
-            return new Point(
-                FrontDesk.X - FrontDesk.W / 2f - 36 - col * 38,
-                FrontDesk.Y + 20 + row * 26);
+            int row = index / perRow;
+            float x = FrontDesk.X + 10f + col * 28f;
+            float y = FrontDesk.Y + FrontDesk.H / 2f + 40f + row * 26f;
+            if (Lobby.W > 0)
+            {
+                float pad = Tile > 0 ? Tile * 2.4f : 24f;
+                x = Geometry.Clamp(x, Lobby.X + pad, Lobby.X + Lobby.W - pad);
+                float deskFront = FrontDesk.Y + FrontDesk.H / 2f + 28f;
+                y = Geometry.Clamp(y, deskFront, Lobby.Y + Lobby.H - pad);
+            }
+
+            return new Point(x, y);
         }
 
         public Point StaffPaySlot(string staffId)
@@ -540,6 +548,15 @@ namespace Vacancy
         public List<string> Validate()
         {
             var problems = Navigation.ValidateFloor(NavGrid, Floor, DeskApproach());
+            for (int i = 0; i < 8; i++)
+            {
+                var slot = CheckoutLineSlot(i);
+                if (Lobby.W > 0 && !Lobby.Contains(slot.X, slot.Y, 12f))
+                {
+                    problems.Add($"Checkout slot {i} is outside the lobby");
+                }
+            }
+
             if (BasementGrid == null || Stairs.W <= 0) return problems;
 
             var permits = new HashSet<string> { "office" };

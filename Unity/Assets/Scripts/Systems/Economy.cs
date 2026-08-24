@@ -179,15 +179,7 @@ namespace Vacancy
 
         static List<Point> PathViaEntrance(GameState state, HotelLayout layout, WaitingGuest guest, Point dest)
         {
-            var options = LobbyWalkOptions(state, guest);
-            var entrance = layout.FrontEntrance;
-            var first = Pathing.FindPath(layout, guest.X, guest.Y, entrance, options);
-            var second = Pathing.FindPath(layout, entrance.X, entrance.Y, dest, options);
-            var combined = new List<Point>(first.Count + second.Count);
-            combined.AddRange(first);
-            combined.AddRange(second);
-            if (combined.Count == 0) combined.Add(dest);
-            return combined;
+            return Pathing.PathAlongCourt(layout, guest.X, guest.Y, dest, LobbyWalkOptions(state, guest));
         }
 
         static bool FollowDrive(GuestCar car, float dt, float speed)
@@ -782,14 +774,14 @@ namespace Vacancy
                         if (Geometry.Dist(guest.X, guest.Y, door.X, door.Y) < 16)
                         {
                             guest.Nav = "to_desk";
-                            guest.Path = Pathing.PathToDeskHall(layout, guest.X, guest.Y);
+                            guest.Path = Pathing.PathGuestToDesk(layout, guest.X, guest.Y);
                         }
                     }
                     else if (guest.Nav == "to_desk")
                     {
                         if (guest.Path == null || guest.Path.Count == 0)
                         {
-                            guest.Path = Pathing.PathToDeskHall(layout, guest.X, guest.Y);
+                            guest.Path = Pathing.PathGuestToDesk(layout, guest.X, guest.Y);
                         }
 
                         if (Pathing.FollowPath(guest, dt, state.Rooms, layout, null, speed))

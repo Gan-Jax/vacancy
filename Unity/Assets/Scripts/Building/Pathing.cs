@@ -127,7 +127,7 @@ namespace Vacancy
 
         public static List<Point> PathToRoomDoor(HotelLayout layout, float fromX, float fromY, int roomId, PathOptions options = null)
         {
-            return FindPath(layout, fromX, fromY, layout.RoomDoor(roomId), options);
+            return PathAlongCourt(layout, fromX, fromY, layout.RoomDoor(roomId), options);
         }
 
         public static List<Point> PathToDeskHall(HotelLayout layout, float fromX, float fromY, PathOptions options = null)
@@ -135,6 +135,47 @@ namespace Vacancy
             options = options ?? new PathOptions();
             if (options.ToFloor == null) options.ToFloor = 0;
             return FindPath(layout, fromX, fromY, layout.DeskApproach(), options);
+        }
+
+        public static List<Point> PathAlongCourt(HotelLayout layout, float fromX, float fromY, Point dest, PathOptions options = null)
+        {
+            options = options ?? new PathOptions();
+            if (options.ToFloor == null) options.ToFloor = 0;
+            if (layout?.Floor == null || !layout.Floor.OutdoorCourt)
+            {
+                return FindPath(layout, fromX, fromY, dest, options);
+            }
+
+            bool fromLobby = layout.Lobby.Contains(fromX, fromY, 4f);
+            bool toLobby = layout.Lobby.Contains(dest.X, dest.Y, 4f);
+            if (fromLobby == toLobby)
+            {
+                return FindPath(layout, fromX, fromY, dest, options);
+            }
+
+            var gate = layout.FrontEntrance;
+            var first = FindPath(layout, fromX, fromY, gate, options);
+            var second = FindPath(layout, gate.X, gate.Y, dest, options);
+            var combined = new List<Point>(first.Count + second.Count);
+            combined.AddRange(first);
+            if (second.Count > 0 && combined.Count > 0 && Geometry.Dist(combined[combined.Count - 1], second[0]) < 4f)
+            {
+                for (int i = 1; i < second.Count; i++) combined.Add(second[i]);
+            }
+            else
+            {
+                combined.AddRange(second);
+            }
+
+            if (combined.Count == 0) combined.Add(dest);
+            return combined;
+        }
+
+        public static List<Point> PathGuestToDesk(HotelLayout layout, float fromX, float fromY, PathOptions options = null)
+        {
+            options = options ?? new PathOptions();
+            if (options.ToFloor == null) options.ToFloor = 0;
+            return PathAlongCourt(layout, fromX, fromY, layout.DeskApproach(), options);
         }
 
         public static bool SteerTo(IMover entity, float tx, float ty, float dt, List<Room> rooms, HotelLayout layout, object allowRoomId, float speed)

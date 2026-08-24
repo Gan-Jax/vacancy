@@ -14,6 +14,7 @@ namespace Vacancy
         public int Rows;
         public byte[] Blocked;
         public string[] Owner;
+        public float[] Cost;
         public float[] Clearance;
     }
 
@@ -51,10 +52,15 @@ namespace Vacancy
                 Cols = cols,
                 Rows = rows,
                 Blocked = new byte[cols * rows],
-                Owner = new string[cols * rows]
+                Owner = new string[cols * rows],
+                Cost = new float[cols * rows]
             };
 
-            for (int i = 0; i < grid.Blocked.Length; i++) grid.Blocked[i] = 1;
+            for (int i = 0; i < grid.Blocked.Length; i++)
+            {
+                grid.Blocked[i] = 1;
+                grid.Cost[i] = 1f;
+            }
 
             foreach (var area in floor.Areas)
             {
@@ -151,21 +157,38 @@ namespace Vacancy
                     {
                         grid.Blocked[i] = 1;
                         grid.Owner[i] = null;
+                        grid.Cost[i] = 1f;
                     }
                     else
                     {
                         grid.Blocked[i] = 0;
                         grid.Owner[i] = area.Token;
+                        grid.Cost[i] = KindCost(area.Kind);
                     }
                 }
             }
         }
 
+        static float KindCost(string kind)
+        {
+            if (kind == AreaKind.Parking) return 1.4f;
+            return 1f;
+        }
+
+        static float StepCost(NavGrid grid, int col, int row, bool diagonal)
+        {
+            float baseCost = diagonal ? DiagonalCost : StraightCost;
+            if (grid.Cost == null) return baseCost;
+            return baseCost * grid.Cost[row * grid.Cols + col];
+        }
+
         static void SealEnvelope(NavGrid grid, BuiltFloor floor)
         {
-            // Motor-court rooms open onto an outdoor covered walk. Sealing a
-            // rectangular envelope would wall guests into the courtyard.
-            if (floor.OutdoorCourt) return;
+            if (floor.OutdoorCourt)
+            {
+                SealMotorCourtHinterland(grid, floor);
+                return;
+            }
 
             var content = floor.Content;
             if (content.W <= 0f || content.H <= 0f) return;
@@ -174,10 +197,7 @@ namespace Vacancy
 
             void Block(int col, int row)
             {
-                if (col < 0 || row < 0 || col >= grid.Cols || row >= grid.Rows) return;
-                int i = row * grid.Cols + col;
-                grid.Blocked[i] = 1;
-                grid.Owner[i] = null;
+                BlockCell(grid, col, row);
             }
 
             // North, west, and east walls turn the room-wing halls into indoor
@@ -191,6 +211,68 @@ namespace Vacancy
             }
         }
 
+        static void BlockCell(NavGrid grid, int col, int row)
+        {
+            if (col < 0 || row < 0 || col >= grid.Cols || row >= grid.Rows) return;
+            int i = row * grid.Cols + col;
+            grid.Blocked[i] = 1;
+            grid.Owner[i] = null;
+            if (grid.Cost != null) grid.Cost[i] = 1f;
+        }
+
+        static void SealMotorCourtHinterland(NavGrid grid, BuiltFloor floor)
+        {
+            // Dirt wrapping the outer L is inside the nav bounds (lobby grew
+            // west; the lot slab is larger still). Leave it blocked so A* cannot
+            // send guests around the back of the west/north wings.
+            float westFace = floor.CornerMass.W > 0f ? floor.CornerMass.X : floor.Lobby.X;
+            float northFace = floor.CornerMass.W > 0f ? floor.CornerMass.Y : floor.Lobby.Y;
+            if (floor.Rooms != null)
+            {
+                foreach (var room in floor.Rooms)
+                {
+                    if (room.DoorSide == "east") westFace = Math.Min(westFace, room.Rect.X);
+                    if (room.DoorSide == "south") northFace = Math.Min(northFace, room.Rect.Y);
+                }
+            }
+
+            float lobbyNorth = floor.Lobby.Y;
+            for (int row = 0; row < grid.Rows; row++)
+            {
+                for (int col = 0; col < grid.Cols; col++)
+                {
+                    var center = CellCenter(grid, col, row);
+                    if (floor.CornerMass.W > 0f && floor.CornerMass.Contains(center.X, center.Y))
+                    {
+                        BlockCell(grid, col, row);
+                        continue;
+                    }
+
+                    bool behindWest = center.X < westFace && center.Y < lobbyNorth;
+                    bool behindNorth = center.Y < northFace;
+                    if (behindWest || behindNorth) BlockCell(grid, col, row);
+                }
+            }
+        }
+
+        public static bool PointBehindWings(BuiltFloor floor, float x, float y)
+        {
+            if (floor == null || !floor.OutdoorCourt) return false;
+            float westFace = floor.CornerMass.W > 0f ? floor.CornerMass.X : floor.Lobby.X;
+            float northFace = floor.CornerMass.W > 0f ? floor.CornerMass.Y : floor.Lobby.Y;
+            if (floor.Rooms != null)
+            {
+                foreach (var room in floor.Rooms)
+                {
+                    if (room.DoorSide == "east") westFace = Math.Min(westFace, room.Rect.X);
+                    if (room.DoorSide == "south") northFace = Math.Min(northFace, room.Rect.Y);
+                }
+            }
+
+            if (y < northFace) return true;
+            return x < westFace && y < floor.Lobby.Y;
+        }
+
         static void CarveDoor(NavGrid grid, FloorArea area, Door door)
         {
             AreaCellRange(grid, area.Rect, out int c0, out int r0, out int c1, out int r1);
@@ -202,6 +284,7 @@ namespace Vacancy
                 int i = row * grid.Cols + col;
                 grid.Blocked[i] = 0;
                 grid.Owner[i] = null;
+                if (grid.Cost != null) grid.Cost[i] = 1f;
             }
 
             if (door.Side == "north" || door.Side == "south")
@@ -367,7 +450,7 @@ namespace Vacancy
 
                         int nIdx = nRow * grid.Cols + nCol;
                         if (closed[nIdx] != 0) continue;
-                        double step = dCol != 0 && dRow != 0 ? DiagonalCost : StraightCost;
+                        double step = StepCost(grid, nCol, nRow, dCol != 0 && dRow != 0);
                         double tentative = gScore[current] + step;
                         if (tentative >= gScore[nIdx]) continue;
                         gScore[nIdx] = tentative;
@@ -456,6 +539,17 @@ namespace Vacancy
                 {
                     problems.Add($"Room {room.Id} door is unreachable from the lobby");
                     continue;
+                }
+
+                var toDesk = FindRoute(grid, room.Approach, from, null, 12f);
+                if (toDesk != null)
+                {
+                    foreach (var point in toDesk)
+                    {
+                        if (!PointBehindWings(floor, point.X, point.Y)) continue;
+                        problems.Add($"Room {room.Id} checkout path goes behind the building");
+                        break;
+                    }
                 }
 
                 var permits = new HashSet<string> { $"room:{room.Id}" };
