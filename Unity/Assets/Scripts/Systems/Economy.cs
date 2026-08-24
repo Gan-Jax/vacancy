@@ -107,6 +107,7 @@ namespace Vacancy
                     "Sign flipped to NO VACANCY — new guests will stop showing up. Anyone already waiting can still check in.");
             }
 
+            Stage.Mark(state, "vacancySign");
             return state.VacancyOpen;
         }
 
@@ -206,6 +207,7 @@ namespace Vacancy
 
             Arrivals.ArmAdmittedThreat(state, waiting);
             Story.Hook(state, "checkIn", waiting, null, cleanRoom);
+            Stage.Mark(state, "checkIn");
             return true;
         }
 
@@ -534,6 +536,7 @@ namespace Vacancy
             }
 
             room.HasHiddenDamage = false;
+            Stage.Mark(state, "roomWork");
         }
 
         public static void FinishCleaning(GameState state, Room room, string byNpc = null)
@@ -552,6 +555,7 @@ namespace Vacancy
                 int repairCost = GetRepairCost(state, room.RepairLevel);
                 state.AddLog(
                     $"Room {room.Id} cleaned ({LevelLabel(level)}). Needs {LevelLabel(room.RepairLevel)} repair ({GameConfig.GetRepairHours(room.RepairLevel)}h, ${repairCost}).{who}");
+                Stage.Mark(state, "roomWork");
                 return;
             }
 
@@ -560,6 +564,7 @@ namespace Vacancy
             room.DamageFound = false;
             state.Reputation = Math.Min(100, state.Reputation + 1);
             state.AddLog($"Room {room.Id} is ready again ({LevelLabel(level)} clean done).{who}");
+            Stage.Mark(state, "roomWork");
         }
 
         public static void FinishRepair(GameState state, Room room, string byNpc = null)
@@ -587,6 +592,7 @@ namespace Vacancy
             string who = string.IsNullOrEmpty(byNpc) ? "" : $" ({byNpc})";
             state.AddLog($"Room {room.Id} repaired ({LevelLabel(level)}). Parts −${cost}.{who}");
             Story.Hook(state, "repair", null, null, room);
+            Stage.Mark(state, "roomWork");
         }
 
         public static void AdvanceTime(GameState state, float dt, HotelLayout layout, List<StaffNpc> staffList)
@@ -651,6 +657,7 @@ namespace Vacancy
             room.Status = "clean";
             state.AddLog($"Unlocked Room {room.Id} for ${cost}.");
             Story.Hook(state, "unlock", null, null, room);
+            Stage.MaybeAdvance(state);
             return true;
         }
 
@@ -661,6 +668,7 @@ namespace Vacancy
             state.BobHired = true;
             state.AddLog(
                 $"Hired Bob — repairs rooms. ${GameConfig.StaffDailyWage}/work day, payday every {GameConfig.StaffPayPeriodDays} days.");
+            Stage.Mark(state, "hireStaff");
             return true;
         }
 
@@ -671,6 +679,7 @@ namespace Vacancy
             state.MaryHired = true;
             state.AddLog(
                 $"Hired Mary — inspects & cleans. ${GameConfig.StaffDailyWage}/work day, payday every {GameConfig.StaffPayPeriodDays} days.");
+            Stage.Mark(state, "hireStaff");
             return true;
         }
     }

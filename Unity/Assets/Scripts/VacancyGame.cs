@@ -299,6 +299,7 @@ namespace Vacancy
 
         public void OpenPc()
         {
+            Stage.Mark(state, "officePc");
             state.PcOpen = true;
             state.Paused = true;
         }
@@ -334,7 +335,7 @@ namespace Vacancy
             if (papers != null && papers.Count > 0 && !papers[0].Read)
             {
                 Media.MarkPaperRead(state);
-                state.AddLog("You read today's paper. New questions are available at the desk.");
+                state.AddLog(Stage.PaperReadLog(state));
             }
 
             state.MediaOpen = "paper";

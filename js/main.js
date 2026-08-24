@@ -35,6 +35,17 @@ import {
   revealedSigns,
 } from "./arrivals.js";
 import { markPaperRead } from "./media.js";
+import {
+  isStageOne,
+  markTutorial,
+  paperReadLog,
+  showShelterHud,
+  tutorialHudLines,
+  tutorialHudNote,
+  tutorialHudSummary,
+  STAGE_ROOM_GATE,
+  unlockedRoomCount,
+} from "./stage.js";
 import { Player, StaffNPC } from "./entities.js";
 import {
   createInput,
@@ -59,7 +70,14 @@ const reputationEl = document.getElementById("reputation");
 const vacancyStatusEl = document.getElementById("vacancy-status");
 const vacancyStatEl = document.getElementById("vacancy-stat");
 const inventoryHudEl = document.getElementById("inventory-hud");
+const tutorialHudEl = document.getElementById("tutorial-hud");
+const tutorialSummaryEl = document.getElementById("tutorial-summary");
+const tutorialListEl = document.getElementById("tutorial-list");
 const shelterHudEl = document.getElementById("shelter-hud");
+const deskAskHeadingEl = document.getElementById("desk-ask-heading");
+const deskAskCopyEl = document.getElementById("desk-ask-copy");
+const radioSubEl = document.getElementById("radio-sub");
+const paperSubEl = document.getElementById("paper-sub");
 const signalEl = document.getElementById("signal");
 const storyBannerEl = document.getElementById("story-banner");
 const storyActEl = document.getElementById("story-act");
@@ -260,14 +278,37 @@ function refreshUI(force = false) {
     inventoryHudEl.textContent = inventoryHudSummary(state);
   }
 
+  if (tutorialHudEl) {
+    const summary = tutorialHudSummary(state);
+    tutorialHudEl.classList.toggle("hidden", !summary);
+    if (summary && tutorialSummaryEl && tutorialListEl) {
+      tutorialSummaryEl.textContent = summary;
+      const lines = tutorialHudLines(state);
+      const note = tutorialHudNote(state);
+      const rooms = unlockedRoomCount(state);
+      tutorialListEl.innerHTML =
+        lines
+          .map(
+            (item) =>
+              `<li class="${item.done ? "done" : ""}">${item.done ? "✓" : "○"} ${item.label}</li>`
+          )
+          .join("") +
+        `<li class="gate">Rooms open: ${rooms} / ${STAGE_ROOM_GATE}</li>` +
+        (note ? `<li class="note">${note}</li>` : "");
+    }
+  }
+
   if (signalEl) {
     signalEl.textContent = storySignalText(state);
   }
 
   if (shelterHudEl) {
-    let summary = shelterHudSummary(state);
-    if (summary) {
-      summary += ` · Humanity: ${state.story.humanity}%`;
+    let summary = "";
+    if (showShelterHud(state)) {
+      summary = shelterHudSummary(state);
+      if (summary && state.story) {
+        summary += ` · Humanity: ${state.story.humanity}%`;
+      }
     }
     shelterHudEl.textContent = summary;
     shelterHudEl.classList.toggle("hidden", !summary);
@@ -308,6 +349,11 @@ function openRadioLog() {
         )
         .join("")
     : `<p class="media-empty">Nothing but weather and road reports so far.</p>`;
+  if (radioSubEl) {
+    radioSubEl.textContent = isStageOne(state)
+      ? "Local AM — weather, road work, and inn ads."
+      : "KCLR and whatever is still on the air. Everyone in the lobby hears this.";
+  }
   state.mediaOpen = "radio";
   state.paused = true;
   radioModal.classList.remove("hidden");
@@ -326,7 +372,7 @@ function openPaperLog() {
   const papers = state.story?.media?.papers ?? [];
   if (papers[0] && !papers[0].read) {
     markPaperRead(state);
-    addLog(state, "You read today's paper. New questions are available at the desk.");
+    addLog(state, paperReadLog(state));
   }
   paperLogEl.innerHTML = papers.length
     ? papers
@@ -339,6 +385,11 @@ function openPaperLog() {
         )
         .join("")
     : `<p class="media-empty">No paper today. The stack is empty.</p>`;
+  if (paperSubEl) {
+    paperSubEl.textContent = isStageOne(state)
+      ? "The morning Gazette — weather, roads, and weekend rates."
+      : "What the broadcast left out. Reading an issue unlocks questions they have not all rehearsed.";
+  }
   state.mediaOpen = "paper";
   state.paused = true;
   paperModal.classList.remove("hidden");
@@ -356,6 +407,7 @@ function closePaperLog() {
 }
 
 function openPc() {
+  markTutorial(state, "officePc");
   state.pcOpen = true;
   state.paused = true;
   pcModal.classList.remove("hidden");
@@ -484,15 +536,26 @@ function refreshDeskReview() {
     ? signs.map((s) => `<li>${s.text}</li>`).join("")
     : `<li class="none">Nothing stands out yet.</li>`;
 
+  if (deskAskHeadingEl) {
+    deskAskHeadingEl.textContent = isStageOne(state)
+      ? "Check-in questions"
+      : "Ask from what you have heard";
+  }
+  if (deskAskCopyEl) {
+    deskAskCopyEl.textContent = isStageOne(state)
+      ? "Ask the usual check-in questions — name, stay length, and payment."
+      : "Radio questions are public. Paper questions only appear after you read the issue.";
+  }
+
   const why = assessArrival(state, guest);
   const rows = [];
 
   rows.push(
     whyRow("Rooms ready", `${why.bunksFree} of ${why.bunksTotal}`, why.bunksFree === 0)
   );
-  rows.push(whyRow("People inside", String(why.occupants)));
+  rows.push(whyRow("Guests staying", String(why.occupants)));
 
-  if (why.shelter) {
+  if (why.shelter && !isStageOne(state)) {
     const w = why.shelter;
     rows.push(
       whyRow(

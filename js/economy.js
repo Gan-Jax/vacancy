@@ -19,6 +19,7 @@ import {
   updateInventoryOrders,
 } from "./inventory.js";
 import { storyHook, updateStory } from "./story.js";
+import { markTutorial, maybeAdvanceStage } from "./stage.js";
 import { updateMedia } from "./media.js";
 import { processDailyShelter } from "./shelter.js";
 import {
@@ -158,6 +159,7 @@ export function toggleVacancy(state) {
       "Sign flipped to NO VACANCY — new guests will stop showing up. Anyone already waiting can still check in."
     );
   }
+  markTutorial(state, "vacancySign");
   return state.vacancyOpen;
 }
 
@@ -258,6 +260,7 @@ export function checkInAtDesk(state, layout, chosenGuest = null) {
 
   armAdmittedThreat(state, waiting);
   storyHook(state, "checkIn", { guest: waiting, room: cleanRoom });
+  markTutorial(state, "checkIn");
   return true;
 }
 
@@ -563,6 +566,7 @@ export function finishInspection(state, room, byNpc = false) {
   }
 
   room.hasHiddenDamage = false;
+  markTutorial(state, "roomWork");
 }
 
 export function finishCleaning(state, room, byNpc = false) {
@@ -582,6 +586,7 @@ export function finishCleaning(state, room, byNpc = false) {
       state,
       `Room ${room.id} cleaned (${levelLabel(level)}). Needs ${levelLabel(room.repairLevel)} repair (${getRepairHours(room.repairLevel)}h, $${repairCost}).${who}`
     );
+    markTutorial(state, "roomWork");
     return;
   }
 
@@ -593,6 +598,7 @@ export function finishCleaning(state, room, byNpc = false) {
     state,
     `Room ${room.id} is ready again (${levelLabel(level)} clean done).${who}`
   );
+  markTutorial(state, "roomWork");
 }
 
 export function finishRepair(state, room, byNpc = false) {
@@ -623,6 +629,7 @@ export function finishRepair(state, room, byNpc = false) {
     `Room ${room.id} repaired (${levelLabel(level)}). Parts −$${cost}.${who}`
   );
   storyHook(state, "repair", { room });
+  markTutorial(state, "roomWork");
 }
 
 export function advanceTime(state, dt, layout, staffList = []) {
@@ -671,6 +678,7 @@ export function unlockRoom(state) {
   room.status = "clean";
   addLog(state, `Unlocked Room ${room.id} for $${cost}.`);
   storyHook(state, "unlock", { room });
+  maybeAdvanceStage(state);
   return true;
 }
 
@@ -682,6 +690,7 @@ export function hireBob(state) {
     state,
     `Hired Bob — repairs rooms. $${CONFIG.staffDailyWage}/work day, payday every ${CONFIG.staffPayPeriodDays} days.`
   );
+  markTutorial(state, "hireStaff");
   return true;
 }
 
@@ -693,6 +702,7 @@ export function hireMary(state) {
     state,
     `Hired Mary — inspects & cleans. $${CONFIG.staffDailyWage}/work day, payday every ${CONFIG.staffPayPeriodDays} days.`
   );
+  markTutorial(state, "hireStaff");
   return true;
 }
 

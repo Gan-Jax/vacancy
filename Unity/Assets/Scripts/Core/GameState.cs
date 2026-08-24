@@ -97,6 +97,8 @@ namespace Vacancy
         public InventoryState Inventory;
         public StoryState Story;
         public ShelterState Shelter;
+        public int Stage = 1;
+        public TutorialProgress Tutorial;
         public bool PcOpen;
         public WaitingGuest DeskGuest;
         public string MediaOpen;
@@ -111,7 +113,9 @@ namespace Vacancy
                 Reputation = GameConfig.StartingReputation,
                 Inventory = InventorySystem.Create(),
                 Story = global::Vacancy.Story.Create(),
-                Shelter = global::Vacancy.Shelter.Create()
+                Shelter = global::Vacancy.Shelter.Create(),
+                Stage = 1,
+                Tutorial = new TutorialProgress()
             };
 
             for (int i = 0; i < roomCount; i++)

@@ -73,6 +73,16 @@ namespace Vacancy
             { "shelter", "Shelter" }
         };
 
+        static readonly string[] Stage1Hints =
+        {
+            "A trucker tips in singles and asks what time checkout is.",
+            "The ice machine is full. Someone already complained it cycles too loud.",
+            "A guest wants the room closest to the lot so they can leave at dawn.",
+            "The vacancy sign bulb flickers once, then holds.",
+            "County weather: clear tonight, light wind on the ridge.",
+            "Someone left a road atlas on the counter, still open to this stretch."
+        };
+
         static readonly Dictionary<string, string[]> Hints = new Dictionary<string, string[]>
         {
             {
@@ -205,8 +215,16 @@ namespace Vacancy
 
         static void FireHint(GameState state)
         {
-            string act = CurrentAct(state);
-            if (!Hints.TryGetValue(act, out var pool)) pool = Hints["normalcy"];
+            string[] pool;
+            if (Stage.IsStageOne(state))
+            {
+                pool = Stage1Hints;
+            }
+            else
+            {
+                string act = CurrentAct(state);
+                if (!Hints.TryGetValue(act, out pool)) pool = Hints["normalcy"];
+            }
             var unseen = new List<string>();
             foreach (var line in pool)
             {
@@ -265,7 +283,7 @@ namespace Vacancy
                 FireHint(state);
             }
 
-            CheckKeystones(state);
+            if (!Stage.IsStageOne(state)) CheckKeystones(state);
         }
 
         public static void Hook(GameState state, string hook, WaitingGuest waiting = null, Guest guest = null, Room room = null)
@@ -309,12 +327,12 @@ namespace Vacancy
                     break;
             }
 
-            CheckKeystones(state);
+            if (!Stage.IsStageOne(state)) CheckKeystones(state);
         }
 
         public static WaitingGuest MaybeMarkArrival(GameState state, WaitingGuest guest)
         {
-            if (state.Story == null) return guest;
+            if (state.Story == null || Stage.IsStageOne(state)) return guest;
             float chance = GameConfig.MarkedChanceByAct.TryGetValue(CurrentAct(state), out var value)
                 ? value
                 : GameConfig.MarkedChanceByAct["normalcy"];

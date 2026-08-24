@@ -2,6 +2,7 @@ import { CONFIG } from "./config.js";
 import { addLog } from "./state.js";
 import { actIndex, ACT_ORDER, storyHook } from "./story.js";
 import { countOccupants, getShelterStock } from "./shelter.js";
+import { isStageOne } from "./stage.js";
 import {
   answerFor,
   availableQuestions,
@@ -30,6 +31,19 @@ export const KIND = {
   survivor: "survivor",
   wrong: "wrong",
 };
+
+const STAGE1_CLAIMS = [
+  "Driving through. Needs a bed and an early checkout.",
+  "Says the next motel is another two hours and they are done driving.",
+  "Here for work in the city. Paying by the night.",
+  "Asked about the weekly rate, then decided on one night.",
+];
+
+const STAGE1_SIGNS = [
+  "They set a suitcase down and keep a hand on the handle.",
+  "They count the cash twice before they speak.",
+  "They ask what time the office opens in the morning.",
+];
 
 const CLAIMS = {
   traveler: [
@@ -77,12 +91,12 @@ const INNOCUOUS_SIGNS = [
 
 const GENERIC_QUESTIONS = [
   {
-    id: "where-from",
-    prompt: "Where did you come from?",
+    id: "register-name",
+    prompt: "What name should I put on the register?",
     answers: {
-      traveler: "Down the access road. I have been driving since morning.",
-      survivor: "On foot. I do not want to say the last town out loud.",
-      wrong: "The city. Everyone comes from the city.",
+      traveler: "The name on my license is fine.",
+      survivor: "Just my first name. I do not want it written down twice.",
+      wrong: "Any name. Names are for registers.",
     },
   },
   {
@@ -92,6 +106,24 @@ const GENERIC_QUESTIONS = [
       traveler: "One night. Maybe two if the roads are still bad.",
       survivor: "Until it is safe. I do not know when that is.",
       wrong: "As long as you will let me. I can stay in any room.",
+    },
+  },
+  {
+    id: "how-pay",
+    prompt: "How are you paying?",
+    answers: {
+      traveler: "Cash. One night up front, same as the last place.",
+      survivor: "I do not have money. I can work if you need hands.",
+      wrong: "I can pay. I have what people pay with.",
+    },
+  },
+  {
+    id: "where-from",
+    prompt: "Where did you come from?",
+    answers: {
+      traveler: "Down the access road. I have been driving since morning.",
+      survivor: "On foot. I do not want to say the last town out loud.",
+      wrong: "The city. Everyone comes from the city.",
     },
   },
 ];
@@ -104,6 +136,7 @@ function pick(list) {
 }
 
 function pickKind(state) {
+  if (isStageOne(state)) return KIND.traveler;
   const act = actIndex(state);
   const roll = Math.random();
 
@@ -153,7 +186,28 @@ function buildSigns(kind) {
   return signs;
 }
 
+function buildStage1Signs() {
+  if (Math.random() >= 0.45) return [];
+  const text = pick(STAGE1_SIGNS);
+  return [{ text, damning: false, revealed: true }];
+}
+
 export function createArrival(state, name) {
+  if (isStageOne(state)) {
+    return {
+      name,
+      kind: KIND.traveler,
+      storyId: null,
+      claim: pick(STAGE1_CLAIMS),
+      signs: buildStage1Signs(),
+      questionsAsked: 0,
+      maxQuestions: 2,
+      askedQuestionIds: [],
+      waitRemainingHours: CONFIG.waitPatienceHours,
+      marked: false,
+    };
+  }
+
   const kind = pickKind(state);
   const story = pickTiedStory(state, kind);
   return {
@@ -173,6 +227,10 @@ export function createArrival(state, name) {
 
 /** Questions the player can still put to this arrival. */
 export function deskQuestions(state, guest) {
+  if (isStageOne(state)) {
+    const asked = new Set(guest?.askedQuestionIds ?? []);
+    return GENERIC_QUESTIONS.filter((q) => !asked.has(q.id));
+  }
   const mediaQs = availableQuestions(state, guest);
   const asked = new Set(guest?.askedQuestionIds ?? []);
   const generic = GENERIC_QUESTIONS.filter((q) => !asked.has(q.id));
@@ -214,7 +272,7 @@ export function assessArrival(state, guest) {
     paysRent: guest.kind === KIND.traveler,
   };
 
-  if (state.shelter?.unlocked) {
+  if (state.shelter?.unlocked && !isStageOne(state)) {
     const use = CONFIG.shelterUse;
     const now = assessment.occupants;
     const after = now + 1;

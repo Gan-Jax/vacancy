@@ -1,6 +1,7 @@
 import { CONFIG } from "./config.js";
 import { addLog } from "./state.js";
 import { activateDefense, unlockShelterSystems } from "./shelter.js";
+import { isStageOne } from "./stage.js";
 
 /**
  * Narrative layer.
@@ -94,6 +95,16 @@ function addDispatch(state, text) {
   state.story.dispatches.unshift({ day: state.day, text });
   if (state.story.dispatches.length > 24) state.story.dispatches.length = 24;
 }
+
+/** Ordinary inn chatter while Stage 1 is still a normal hotel. */
+const STAGE1_HINTS = [
+  "A trucker tips in singles and asks what time checkout is.",
+  "The ice machine is full. Someone already complained it cycles too loud.",
+  "A guest wants the room closest to the lot so they can leave at dawn.",
+  "The vacancy sign bulb flickers once, then holds.",
+  "County weather: clear tonight, light wind on the ridge.",
+  "Someone left a road atlas on the counter, still open to this stretch.",
+];
 
 /** Ambient flavor. Never mechanical — just wrongness accumulating. */
 const HINTS = {
@@ -258,7 +269,9 @@ function hintInterval(state) {
 }
 
 function fireHint(state) {
-  const pool = HINTS[currentAct(state)] ?? HINTS.normalcy;
+  const pool = isStageOne(state)
+    ? STAGE1_HINTS
+    : HINTS[currentAct(state)] ?? HINTS.normalcy;
   const unseen = pool.filter((line) => !state.story.flags[`hint:${line}`]);
   const options = unseen.length ? unseen : pool;
   const line = options[Math.floor(Math.random() * options.length)];
@@ -307,7 +320,7 @@ export function updateStory(state, hoursPassed) {
     fireHint(state);
   }
 
-  checkKeystones(state);
+  if (!isStageOne(state)) checkKeystones(state);
 }
 
 /**
@@ -353,7 +366,7 @@ export function storyHook(state, hook, payload = {}) {
       break;
   }
 
-  checkKeystones(state);
+  if (!isStageOne(state)) checkKeystones(state);
 }
 
 /**
@@ -371,7 +384,7 @@ const TELLS = [
 ];
 
 export function maybeMarkArrival(state, guest) {
-  if (!state.story) return guest;
+  if (!state.story || isStageOne(state)) return guest;
   const chance =
     CONFIG.story.markedChanceByAct[currentAct(state)] ??
     CONFIG.story.markedChanceByAct.normalcy;

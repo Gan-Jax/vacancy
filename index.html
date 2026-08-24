@@ -35,6 +35,10 @@
         </div>
       </div>
       <div id="inventory-hud" class="inventory-hud"></div>
+      <details id="tutorial-hud" class="tutorial-hud">
+        <summary id="tutorial-summary">Today's tasks</summary>
+        <ul id="tutorial-list"></ul>
+      </details>
       <div id="shelter-hud" class="shelter-hud hidden"></div>
 
       <canvas id="game" width="1360" height="820"></canvas>
@@ -42,8 +46,8 @@
       <div id="controls">
         <p><strong>Move:</strong> WASD or arrow keys</p>
         <p><strong>Interact:</strong> E — desk, office PC, unlock, inspect → clean → repair</p>
-        <p><strong>At the desk:</strong> E opens the arrival review — pick a question from the radio or paper, then admit or turn away</p>
-        <p><strong>Radio / paper:</strong> E on the lobby radio, E on the newspaper stack, or click the Radio HUD. Paper questions only unlock after you read the issue.</p>
+        <p><strong>At the desk:</strong> E opens the arrival review — ask the usual check-in questions, then admit or turn away</p>
+        <p><strong>Radio / paper:</strong> E on the lobby radio, E on the newspaper stack, or click the Radio HUD.</p>
         <p><strong>Vacancy sign:</strong> V, shop button, or E on the bottom-center sign</p>
         <p><strong>Pause:</strong> P</p>
         <p><strong>Inspect layout:</strong> X — hover for name/position, click to log it for copy-paste</p>
@@ -98,8 +102,8 @@
         </div>
 
         <div class="desk-section">
-          <h3>Ask from what you have heard</h3>
-          <p class="desk-hint">Radio questions are public. Everyone in this lobby has heard them — including the ones that are not people. Paper questions only appear after you read the issue.</p>
+          <h3 id="desk-ask-heading">Check-in questions</h3>
+          <p id="desk-ask-copy" class="desk-hint">Ask the usual check-in questions — name, stay length, and payment.</p>
           <div id="desk-questions" class="desk-questions"></div>
         </div>
 
@@ -121,7 +125,7 @@
           <h2>Lobby radio</h2>
           <button id="radio-close" type="button" class="modal-close">Close</button>
         </div>
-        <p class="modal-sub">KCLR and whatever is still on the air. Everyone hears this. Do not treat it as a secret.</p>
+        <p id="radio-sub" class="modal-sub">Local AM — weather, road work, and inn ads.</p>
         <div id="radio-log" class="media-log"></div>
       </div>
     </div>
@@ -132,7 +136,7 @@
           <h2>Desk paper</h2>
           <button id="paper-close" type="button" class="modal-close">Close</button>
         </div>
-        <p class="modal-sub">What the broadcast left out. Reading an issue unlocks questions they have not all rehearsed.</p>
+        <p id="paper-sub" class="modal-sub">The morning Gazette — weather, roads, and weekend rates.</p>
         <div id="paper-log" class="media-log"></div>
       </div>
     </div>

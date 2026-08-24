@@ -21,6 +21,8 @@ namespace Vacancy
         readonly Text shelter;
         readonly Foldout shopFold;
         readonly Foldout logFold;
+        readonly Foldout taskFold;
+        readonly Text taskLines;
         readonly ScrollBox logBox;
         readonly Button hireBob;
         readonly Button hireMary;
@@ -91,6 +93,19 @@ namespace Vacancy
             radio = MakeText(top.transform, "Local AM — weather, roads", new Vector2(520, 18), 13, Palette.Accent, 460);
             inventory = MakeText(top.transform, "", new Vector2(200, -22), 12, Palette.Muted, 900);
             shelter = MakeText(top.transform, "", new Vector2(200, -42), 12, Palette.Accent, 900);
+
+            taskFold = MakeFoldout(
+                "Tasks",
+                canvasGo.transform,
+                new Vector2(0f, 1f),
+                new Vector2(168, -140),
+                new Vector2(312, 40),
+                new Vector2(312, 220),
+                "Today's tasks");
+            taskLines = MakeText(taskFold.Body, "Tasks", Vector2.zero, 13, Palette.Text, 276);
+            taskLines.alignment = TextAnchor.UpperLeft;
+            taskLines.rectTransform.sizeDelta = new Vector2(276, 150);
+            taskLines.verticalOverflow = VerticalWrapMode.Overflow;
 
             shopFold = MakeFoldout(
                 "Shop",
@@ -194,14 +209,26 @@ namespace Vacancy
             radio.text = Media.RadioHudText(state);
             inventory.text = InventorySystem.HudSummary(state);
 
-            string shelterLine = Shelter.HudSummary(state);
-            if (!string.IsNullOrEmpty(shelterLine) && state.Story != null)
+            string shelterLine = "";
+            if (Stage.ShowShelterHud(state))
             {
-                shelterLine += $" · Humanity: {state.Story.Humanity}%";
+                shelterLine = Shelter.HudSummary(state);
+                if (!string.IsNullOrEmpty(shelterLine) && state.Story != null)
+                {
+                    shelterLine += $" · Humanity: {state.Story.Humanity}%";
+                }
             }
 
             shelter.text = shelterLine;
             shelter.gameObject.SetActive(!string.IsNullOrEmpty(shelterLine));
+
+            bool showTasks = Stage.IsStageOne(state);
+            taskFold.SetVisible(showTasks);
+            if (showTasks)
+            {
+                taskFold.SetSubtitle(Stage.HudSummary(state));
+                taskLines.text = Stage.HudBody(state);
+            }
 
             hireBob.interactable = !state.BobHired && state.Money >= GameConfig.HireBobCost;
             hireBob.GetComponentInChildren<Text>().text = state.BobHired
@@ -359,9 +386,9 @@ namespace Vacancy
             var rows = new List<string>
             {
                 $"Rooms ready: {why.BunksFree} of {why.BunksTotal}",
-                $"People inside: {why.Occupants}"
+                $"Guests staying: {why.Occupants}"
             };
-            if (why.Shelter != null)
+            if (why.Shelter != null && !Stage.IsStageOne(state))
             {
                 rows.Add($"Water: {why.Shelter.WaterDays}d → {why.Shelter.WaterDaysAfter}d if admitted");
                 rows.Add($"Food: {why.Shelter.FoodDays}d → {why.Shelter.FoodDaysAfter}d if admitted");
@@ -696,6 +723,11 @@ namespace Vacancy
 
             public Transform Body => body;
             public bool Open { get; private set; }
+
+            public void SetVisible(bool visible)
+            {
+                root.SetActive(visible);
+            }
 
             public Foldout(GameObject root, Transform body, Text header, string title, Vector2 closedSize, Vector2 openSize)
             {

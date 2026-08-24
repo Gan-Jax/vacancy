@@ -67,6 +67,7 @@ namespace Vacancy
 
         static List<MediaStory> AvailableStories(GameState state)
         {
+            if (Stage.IsStageOne(state)) return new List<MediaStory>(Stage1Stories);
             int rank = Story.ActIndex(state);
             var list = new List<MediaStory>();
             foreach (var story in Stories)
@@ -239,6 +240,7 @@ namespace Vacancy
 
         public static List<MediaQuestion> AvailableQuestions(GameState state, WaitingGuest guest)
         {
+            if (Stage.IsStageOne(state)) return new List<MediaQuestion>();
             var list = new List<MediaQuestion>();
             foreach (var story in KnownStories(state))
             {
@@ -316,6 +318,78 @@ namespace Vacancy
                 }
             };
         }
+
+        static readonly MediaStory[] Stage1Stories =
+        {
+            new MediaStory
+            {
+                Id = "weather-ridge",
+                MinAct = "normalcy",
+                Kind = GuestKind.Traveler,
+                Radio = new RadioEntry
+                {
+                    Headline = "Clear through Thursday — light wind on the ridge",
+                    Body = "The county forecast calls for dry nights and a light ridge wind. No storm warnings. Overnight lows stay in the fifties."
+                },
+                Paper = new PaperIssue
+                {
+                    Headline = "Forecast holds: dry weekend, good for the access road",
+                    Body = "Travel weather looks ordinary. The Gazette notes a few inns still have weekend rooms if you are driving the western corridor."
+                },
+                Questions = new List<MediaQuestion>()
+            },
+            new MediaStory
+            {
+                Id = "county-patch",
+                MinAct = "normalcy",
+                Kind = GuestKind.Traveler,
+                Radio = new RadioEntry
+                {
+                    Headline = "County crews patching potholes on the access road tonight",
+                    Body = "Expect single-lane delays after dusk. Crews say the work should be done before Friday traffic."
+                },
+                Paper = new PaperIssue
+                {
+                    Headline = "Road work expected to finish before Friday traffic",
+                    Body = "The county posted a short notice: cones on the access road, then a swept lane by morning. No detour unless the weather turns."
+                },
+                Questions = new List<MediaQuestion>()
+            },
+            new MediaStory
+            {
+                Id = "weekend-rates",
+                MinAct = "normalcy",
+                Kind = GuestKind.Traveler,
+                Radio = new RadioEntry
+                {
+                    Headline = "Inns along the corridor advertising weekend rates",
+                    Body = "A stretch of roadside places is running the usual weekend special. Stations are reading the spots between weather and farm prices."
+                },
+                Paper = new PaperIssue
+                {
+                    Headline = "Travel section: roadside stays still cheaper than the city",
+                    Body = "The Gazette lists midweek rates at inns between here and Pell. Nothing fancy. Clean rooms and an early checkout if you ask."
+                },
+                Questions = new List<MediaQuestion>()
+            },
+            new MediaStory
+            {
+                Id = "harvest-fair",
+                MinAct = "normalcy",
+                Kind = GuestKind.Traveler,
+                Radio = new RadioEntry
+                {
+                    Headline = "Pell harvest fair Saturday — extra traffic after noon",
+                    Body = "Fair parking fills early. If you are only passing through, give yourself an extra half hour on the county road."
+                },
+                Paper = new PaperIssue
+                {
+                    Headline = "Fair weekend: a few walk-in rooms left at the corridor inns",
+                    Body = "Local desks report the usual Saturday bump. Most travelers are in and out by Sunday morning."
+                },
+                Questions = new List<MediaQuestion>()
+            }
+        };
 
         static readonly MediaStory[] Stories =
         {

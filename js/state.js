@@ -54,6 +54,15 @@ export function createInitialState(roomCount = CONFIG.maxRooms) {
     story: createStoryState(),
     /** Late-game shelter resources and barricades. Dormant at first. */
     shelter: createShelterState(),
+    /** 1 = ordinary hotel. 2+ after tutorial + 7th room. */
+    stage: 1,
+    tutorial: {
+      checkIn: false,
+      vacancySign: false,
+      roomWork: false,
+      hireStaff: false,
+      officePc: false,
+    },
     /** Office PC order panel open. */
     pcOpen: false,
     /** Arrival currently being reviewed at the desk (admit / turn away). */

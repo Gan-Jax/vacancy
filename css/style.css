@@ -187,6 +187,47 @@ header h1 {
   font-size: 0.85rem;
 }
 
+.tutorial-hud {
+  margin: 0 0 0.75rem;
+  padding: 0.35rem 0.75rem;
+  background: #1e283c;
+  border: 1px solid #33415f;
+  border-radius: 8px;
+  color: #d7e0ee;
+  font-size: 0.85rem;
+}
+
+.tutorial-hud.hidden {
+  display: none;
+}
+
+.tutorial-hud summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: #ffd166;
+}
+
+.tutorial-hud ul {
+  list-style: none;
+  margin: 0.4rem 0 0.15rem;
+  padding: 0;
+}
+
+.tutorial-hud li {
+  margin: 0.15rem 0;
+  color: #b8c4da;
+}
+
+.tutorial-hud li.done {
+  color: #9dffb0;
+}
+
+.tutorial-hud li.gate,
+.tutorial-hud li.note {
+  margin-top: 0.35rem;
+  color: #ffd166;
+}
+
 .shelter-hud {
   margin: 0 0 0.75rem;
   padding: 0.45rem 0.75rem;

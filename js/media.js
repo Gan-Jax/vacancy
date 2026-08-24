@@ -1,5 +1,6 @@
 import { addLog } from "./state.js";
 import { ACT_ORDER, currentAct, actIndex } from "./story.js";
+import { isStageOne } from "./stage.js";
 
 /**
  * Radio is public. Everyone in the lobby has heard it — including the things
@@ -21,6 +22,82 @@ export function createMediaState() {
     lastPaperDay: 0,
   };
 }
+
+/** Weather, roads, and inn ads. Stage 1 only — no highway-man story. */
+const STAGE1_STORIES = [
+  {
+    id: "weather-ridge",
+    minAct: "normalcy",
+    kind: "traveler",
+    radio: {
+      headline: "Clear through Thursday — light wind on the ridge",
+      body:
+        "The county forecast calls for dry nights and a light ridge wind. " +
+        "No storm warnings. Overnight lows stay in the fifties.",
+    },
+    paper: {
+      headline: "Forecast holds: dry weekend, good for the access road",
+      body:
+        "Travel weather looks ordinary. The Gazette notes a few inns still " +
+        "have weekend rooms if you are driving the western corridor.",
+    },
+    questions: [],
+  },
+  {
+    id: "county-patch",
+    minAct: "normalcy",
+    kind: "traveler",
+    radio: {
+      headline: "County crews patching potholes on the access road tonight",
+      body:
+        "Expect single-lane delays after dusk. Crews say the work should be " +
+        "done before Friday traffic.",
+    },
+    paper: {
+      headline: "Road work expected to finish before Friday traffic",
+      body:
+        "The county posted a short notice: cones on the access road, then " +
+        "a swept lane by morning. No detour unless the weather turns.",
+    },
+    questions: [],
+  },
+  {
+    id: "weekend-rates",
+    minAct: "normalcy",
+    kind: "traveler",
+    radio: {
+      headline: "Inns along the corridor advertising weekend rates",
+      body:
+        "A stretch of roadside places is running the usual weekend special. " +
+        "Stations are reading the spots between weather and farm prices.",
+    },
+    paper: {
+      headline: "Travel section: roadside stays still cheaper than the city",
+      body:
+        "The Gazette lists midweek rates at inns between here and Pell. " +
+        "Nothing fancy. Clean rooms and an early checkout if you ask.",
+    },
+    questions: [],
+  },
+  {
+    id: "harvest-fair",
+    minAct: "normalcy",
+    kind: "traveler",
+    radio: {
+      headline: "Pell harvest fair Saturday — extra traffic after noon",
+      body:
+        "Fair parking fills early. If you are only passing through, give " +
+        "yourself an extra half hour on the county road.",
+    },
+    paper: {
+      headline: "Fair weekend: a few walk-in rooms left at the corridor inns",
+      body:
+        "Local desks report the usual Saturday bump. Most travelers are in " +
+        "and out by Sunday morning.",
+    },
+    questions: [],
+  },
+];
 
 const STORIES = [
   {
@@ -399,6 +476,7 @@ function actRank(name) {
 }
 
 function availableStories(state) {
+  if (isStageOne(state)) return STAGE1_STORIES;
   const rank = actIndex(state);
   return STORIES.filter((story) => actRank(story.minAct) <= rank);
 }
@@ -518,6 +596,7 @@ export function knownStories(state) {
  * Paper questions unlock only after the issue has been read.
  */
 export function availableQuestions(state, guest) {
+  if (isStageOne(state)) return [];
   const list = [];
   for (const story of knownStories(state)) {
     for (const q of story.questions) {

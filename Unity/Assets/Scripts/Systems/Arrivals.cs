@@ -36,6 +36,21 @@ namespace Vacancy
     {
         const float QuestionHours = 0.75f;
 
+        static readonly string[] Stage1Claims =
+        {
+            "Driving through. Needs a bed and an early checkout.",
+            "Says the next motel is another two hours and they are done driving.",
+            "Here for work in the city. Paying by the night.",
+            "Asked about the weekly rate, then decided on one night."
+        };
+
+        static readonly string[] Stage1Signs =
+        {
+            "They set a suitcase down and keep a hand on the handle.",
+            "They count the cash twice before they speak.",
+            "They ask what time the office opens in the morning."
+        };
+
         static readonly Dictionary<string, string[]> Claims = new Dictionary<string, string[]>
         {
             {
@@ -97,14 +112,14 @@ namespace Vacancy
         {
             new MediaQuestion
             {
-                Id = "where-from",
+                Id = "register-name",
                 Source = "generic",
-                Prompt = "Where did you come from?",
+                Prompt = "What name should I put on the register?",
                 Answers = new Dictionary<string, string>
                 {
-                    { GuestKind.Traveler, "Down the access road. I have been driving since morning." },
-                    { GuestKind.Survivor, "On foot. I do not want to say the last town out loud." },
-                    { GuestKind.Wrong, "The city. Everyone comes from the city." }
+                    { GuestKind.Traveler, "The name on my license is fine." },
+                    { GuestKind.Survivor, "Just my first name. I do not want it written down twice." },
+                    { GuestKind.Wrong, "Any name. Names are for registers." }
                 }
             },
             new MediaQuestion
@@ -118,6 +133,30 @@ namespace Vacancy
                     { GuestKind.Survivor, "Until it is safe. I do not know when that is." },
                     { GuestKind.Wrong, "As long as you will let me. I can stay in any room." }
                 }
+            },
+            new MediaQuestion
+            {
+                Id = "how-pay",
+                Source = "generic",
+                Prompt = "How are you paying?",
+                Answers = new Dictionary<string, string>
+                {
+                    { GuestKind.Traveler, "Cash. One night up front, same as the last place." },
+                    { GuestKind.Survivor, "I do not have money. I can work if you need hands." },
+                    { GuestKind.Wrong, "I can pay. I have what people pay with." }
+                }
+            },
+            new MediaQuestion
+            {
+                Id = "where-from",
+                Source = "generic",
+                Prompt = "Where did you come from?",
+                Answers = new Dictionary<string, string>
+                {
+                    { GuestKind.Traveler, "Down the access road. I have been driving since morning." },
+                    { GuestKind.Survivor, "On foot. I do not want to say the last town out loud." },
+                    { GuestKind.Wrong, "The city. Everyone comes from the city." }
+                }
             }
         };
 
@@ -128,6 +167,7 @@ namespace Vacancy
 
         static string PickKind(GameState state)
         {
+            if (Stage.IsStageOne(state)) return GuestKind.Traveler;
             int act = Story.ActIndex(state);
             float roll = GameRng.NextFloat();
             int unease = Array.IndexOf(Story.ActOrder, "unease");
@@ -190,8 +230,36 @@ namespace Vacancy
             return signs;
         }
 
+        static List<GuestSign> BuildStage1Signs()
+        {
+            var signs = new List<GuestSign>();
+            if (GameRng.NextFloat() >= 0.45f) return signs;
+            signs.Add(new GuestSign
+            {
+                Text = Pick(Stage1Signs),
+                Damning = false,
+                Revealed = true
+            });
+            return signs;
+        }
+
         public static WaitingGuest CreateArrival(GameState state, string name)
         {
+            if (Stage.IsStageOne(state))
+            {
+                var ordinary = new WaitingGuest
+                {
+                    Name = name,
+                    Kind = GuestKind.Traveler,
+                    StoryId = null,
+                    Claim = Pick(Stage1Claims),
+                    WaitRemainingHours = GameConfig.WaitPatienceHours,
+                    Marked = false
+                };
+                ordinary.Signs.AddRange(BuildStage1Signs());
+                return ordinary;
+            }
+
             string kind = PickKind(state);
             var story = Media.PickTiedStory(state, kind);
             var guest = new WaitingGuest
@@ -209,6 +277,18 @@ namespace Vacancy
 
         public static List<MediaQuestion> DeskQuestions(GameState state, WaitingGuest guest)
         {
+            if (Stage.IsStageOne(state))
+            {
+                var askedIds = new HashSet<string>(guest?.AskedQuestionIds ?? new List<string>());
+                var basics = new List<MediaQuestion>();
+                foreach (var q in GenericQuestions)
+                {
+                    if (!askedIds.Contains(q.Id)) basics.Add(q);
+                }
+
+                return basics;
+            }
+
             var mediaQs = Media.AvailableQuestions(state, guest);
             var asked = new HashSet<string>(guest?.AskedQuestionIds ?? new List<string>());
             var list = new List<MediaQuestion>();
@@ -282,7 +362,7 @@ namespace Vacancy
                 PaysRent = guest.Kind == GuestKind.Traveler
             };
 
-            if (state.Shelter != null && state.Shelter.Unlocked)
+            if (state.Shelter != null && state.Shelter.Unlocked && !Stage.IsStageOne(state))
             {
                 int now = assessment.Occupants;
                 int after = now + 1;
