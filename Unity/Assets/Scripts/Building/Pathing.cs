@@ -178,6 +178,13 @@ namespace Vacancy
             return PathAlongCourt(layout, fromX, fromY, layout.DeskApproach(), options);
         }
 
+        public static List<Point> PathToNewspaper(HotelLayout layout, float fromX, float fromY, PathOptions options = null)
+        {
+            options = options ?? new PathOptions();
+            if (options.ToFloor == null) options.ToFloor = 0;
+            return FindPath(layout, fromX, fromY, layout.NewspaperApproach(), options);
+        }
+
         public static bool SteerTo(IMover entity, float tx, float ty, float dt, List<Room> rooms, HotelLayout layout, object allowRoomId, float speed)
         {
             float dx = tx - entity.X;

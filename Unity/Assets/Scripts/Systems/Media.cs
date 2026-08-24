@@ -141,7 +141,7 @@ namespace Vacancy
             });
             if (media.Papers.Count > 12) media.Papers.RemoveRange(12, media.Papers.Count - 12);
             media.LastPaperDay = state.Day;
-            state.AddLog($"Today's paper is on the desk. {story.Paper.Headline}");
+            state.AddLog($"Today's paper is in the newspaper box. {story.Paper.Headline}");
         }
 
         public static void Update(GameState state, float hoursPassed)

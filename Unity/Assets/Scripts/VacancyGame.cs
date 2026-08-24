@@ -237,18 +237,8 @@ namespace Vacancy
         void HandleInteract()
         {
             if (state.PcOpen || player.ActiveTask != null) return;
-            bool phoneQueue = Economy.FirstAtDesk(state) != null;
-            bool deskQueue = false;
-            foreach (var guest in state.ActiveGuests)
-            {
-                if (guest.Phase == "waiting_checkout")
-                {
-                    deskQueue = true;
-                    break;
-                }
-            }
 
-            var target = player.GetInteractTarget(state.Rooms, layout, StaffList(), deskQueue, phoneQueue);
+            var target = player.GetInteractTarget(state.Rooms, layout, StaffList());
             if (target == null) return;
 
             if (target.Kind == "radio")
@@ -277,8 +267,7 @@ namespace Vacancy
 
             if (target.Kind == "desk")
             {
-                string result = Economy.HandleDeskAction(state, layout, StaffList());
-                if (result == "phone") OpenPhone();
+                Economy.HandleDeskAction(state, layout, StaffList());
                 return;
             }
 
@@ -511,12 +500,18 @@ namespace Vacancy
             if (!state.PauseMenuOpen && !state.PcOpen && state.DeskGuest == null) state.Paused = false;
         }
 
-        public void ReviewArrivalFromPhone()
+        public void ReviewArrivalFromDeskPc()
         {
             if (Economy.FirstAtDesk(state) == null) return;
             state.MediaOpen = null;
-            hud.HidePhone();
+            hud.HideDeskPc();
             OpenDeskReview();
+        }
+
+        public void ProcessDeskPcCheckout()
+        {
+            Economy.CheckOutAtDesk(state, layout);
+            if (Economy.CountWaitingCheckout(state) == 0) hud.ShowDeskPcPage("home");
         }
 
         public void OpenDeskPc()

@@ -91,8 +91,8 @@ namespace Vacancy
             Label("Radio", radio.X - 14, radio.Y + radio.H / 2f + 2, Palette.Hex("#dbc5a2"), 9);
 
             var paper = layout.Newspaper;
-            Quad("Paper", new Rect(paper.X - paper.W / 2f, paper.Y - paper.H / 2f, paper.W, paper.H), Palette.Paper, 6);
-            Label("Paper", paper.X - 12, paper.Y - 4, Palette.Hex("#3a2818"), 8);
+            Quad("Paper", new Rect(paper.X - paper.W / 2f, paper.Y - paper.H / 2f, paper.W, paper.H), Palette.Hex("#7a2e2e"), 6);
+            Label("Newspaper", paper.X - 28, paper.Y + paper.H / 2f + 2, Palette.Hex("#dbc5a2"), 9);
 
             var phone = layout.DeskPhone;
             if (phone != null)
@@ -314,7 +314,7 @@ namespace Vacancy
         {
             foreach (var guest in state.ActiveGuests)
             {
-                if (guest.Phase == "waiting_checkout") return "Press E to check out guests";
+                if (guest.Phase == "waiting_checkout") return "Press E on the desk PC to check guests out";
             }
 
             foreach (var person in staff)
@@ -325,8 +325,8 @@ namespace Vacancy
                 }
             }
 
-            if (state.WaitingGuests.Count > 0) return "Press E on the phone to check them in";
-            return "E phone / desk PC · E radio / paper · E office PC (supplies / hire) · V sign · Esc pause";
+            if (Economy.FirstAtDesk(state) != null) return "Press E on the desk PC to check them in";
+            return "E desk PC · E radio / newspaper box · E office PC (supplies / hire) · V sign · Esc pause";
         }
 
         static Sprite MakeSquare()

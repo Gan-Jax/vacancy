@@ -65,6 +65,8 @@ namespace Vacancy
         public string ArrivePhase;
         public int StallIndex = -1;
         public string CarColor;
+        public bool BoughtPaper;
+        public bool PaperOffered;
     }
 
     public sealed class GuestCar
@@ -106,6 +108,9 @@ namespace Vacancy
         public float FootY { get; set; }
         public int StallIndex = -1;
         public string CarColor;
+        public bool BoughtPaper;
+        public bool PaperOffered;
+        public float? PaperTripIn;
     }
 
     public sealed class GameState
@@ -156,7 +161,7 @@ namespace Vacancy
                 });
             }
 
-            state.AddLog("Welcome to the roadside inn. Meet guests at the front desk (E) to check them in.");
+            state.AddLog("Welcome to the roadside inn. Check guests in and out at the desk PC.");
             state.AddLog("Use the office PC to order supplies or hire help.");
             return state;
         }

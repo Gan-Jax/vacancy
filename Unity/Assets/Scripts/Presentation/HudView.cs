@@ -58,11 +58,17 @@ namespace Vacancy
         readonly GameObject paperPanel;
         readonly Text paperLog;
         readonly GameObject phonePanel;
-        readonly Text phoneArrivals;
         readonly Text phoneRequests;
-        readonly Button phoneReview;
         readonly GameObject deskPcPanel;
+        readonly GameObject deskPcHomePage;
+        readonly GameObject deskPcCheckoutPage;
+        readonly GameObject deskPcBookPage;
+        readonly Button deskPcCheckInBtn;
+        readonly Button deskPcCheckOutBtn;
+        readonly Text deskPcCheckoutInfo;
+        readonly Button deskPcCheckoutAction;
         readonly Text deskPcLog;
+        string deskPcPage = "home";
         readonly GameObject bannerPanel;
         readonly Text bannerAct;
         readonly Text bannerTitle;
@@ -241,27 +247,52 @@ namespace Vacancy
             ButtonOn(paperPanel.transform, "Close", new Vector2(0, -200), () => game.ClosePaper(), 140, 32);
             paperPanel.SetActive(false);
 
-            phonePanel = Panel("DeskPhone", canvasGo.transform, new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(560, 480));
-            MakeText(phonePanel.transform, "Front desk phone", new Vector2(0, 200), 20, Palette.Accent, 520);
-            MakeText(phonePanel.transform, "Check-in", new Vector2(0, 158), 14, Palette.Muted, 520);
-            phoneArrivals = MakeText(phonePanel.transform, "", new Vector2(0, 108), 15, Palette.Text, 520);
-            phoneArrivals.alignment = TextAnchor.UpperCenter;
-            phoneArrivals.rectTransform.sizeDelta = new Vector2(520, 72);
-            phoneReview = ButtonOn(phonePanel.transform, "Review arrival", new Vector2(0, 28), () => game.ReviewArrivalFromPhone(), 220, 36);
-            MakeText(phonePanel.transform, "Requests", new Vector2(0, -24), 14, Palette.Muted, 520);
-            phoneRequests = MakeText(phonePanel.transform, "No guest requests yet.", new Vector2(0, -72), 14, Palette.Text, 520);
+            phonePanel = Panel("DeskPhone", canvasGo.transform, new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(560, 420));
+            MakeText(phonePanel.transform, "Front desk phone", new Vector2(0, 160), 20, Palette.Accent, 520);
+            MakeText(phonePanel.transform, "Requests", new Vector2(0, 110), 14, Palette.Muted, 520);
+            phoneRequests = MakeText(
+                phonePanel.transform,
+                "No guest requests yet.\nUse the desk PC to check guests in and out.",
+                new Vector2(0, 20),
+                15,
+                Palette.Text,
+                520);
             phoneRequests.alignment = TextAnchor.UpperCenter;
-            phoneRequests.rectTransform.sizeDelta = new Vector2(520, 64);
-            ButtonOn(phonePanel.transform, "Close", new Vector2(0, -190), () => game.ClosePhone(), 140, 32);
+            phoneRequests.rectTransform.sizeDelta = new Vector2(520, 160);
+            ButtonOn(phonePanel.transform, "Close", new Vector2(0, -160), () => game.ClosePhone(), 140, 32);
             phonePanel.SetActive(false);
 
-            deskPcPanel = Panel("DeskPc", canvasGo.transform, new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(560, 420));
-            MakeText(deskPcPanel.transform, "Front desk PC", new Vector2(0, 170), 20, Palette.Accent, 520);
-            deskPcLog = MakeText(deskPcPanel.transform, "", new Vector2(0, 10), 14, Palette.Text, 520);
+            deskPcPanel = Panel("DeskPc", canvasGo.transform, new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(560, 500));
+            deskPcHomePage = PageOn(deskPcPanel.transform, "Home");
+            MakeText(deskPcHomePage.transform, "Front desk PC", new Vector2(0, 200), 20, Palette.Accent, 520);
+            MakeText(deskPcHomePage.transform, "Check guests in and out. Guest book is read-only.", new Vector2(0, 156), 14, Palette.Muted, 520);
+            deskPcCheckInBtn = ButtonOn(deskPcHomePage.transform, "Check in (0)", new Vector2(0, 70), () => game.ReviewArrivalFromDeskPc(), 280, 44);
+            deskPcCheckOutBtn = ButtonOn(deskPcHomePage.transform, "Check out (0)", new Vector2(0, 10), () => ShowDeskPcPage("checkout"), 280, 44);
+            ButtonOn(deskPcHomePage.transform, "Guest book", new Vector2(0, -50), () => ShowDeskPcPage("book"), 280, 44);
+            ButtonOn(deskPcHomePage.transform, "Close", new Vector2(0, -200), () => game.CloseDeskPc(), 140, 32);
+
+            deskPcCheckoutPage = PageOn(deskPcPanel.transform, "Checkout");
+            MakeText(deskPcCheckoutPage.transform, "Check out", new Vector2(0, 200), 20, Palette.Accent, 520);
+            deskPcCheckoutInfo = MakeText(deskPcCheckoutPage.transform, "", new Vector2(0, 60), 15, Palette.Text, 520);
+            deskPcCheckoutInfo.alignment = TextAnchor.UpperCenter;
+            deskPcCheckoutInfo.rectTransform.sizeDelta = new Vector2(520, 160);
+            deskPcCheckoutAction = ButtonOn(
+                deskPcCheckoutPage.transform,
+                "Process checkout",
+                new Vector2(0, -60),
+                () => game.ProcessDeskPcCheckout(),
+                280,
+                44);
+            ButtonOn(deskPcCheckoutPage.transform, "Back", new Vector2(0, -200), () => ShowDeskPcPage("home"), 140, 32);
+
+            deskPcBookPage = PageOn(deskPcPanel.transform, "Book");
+            MakeText(deskPcBookPage.transform, "Guest book", new Vector2(0, 200), 20, Palette.Accent, 520);
+            deskPcLog = MakeText(deskPcBookPage.transform, "", new Vector2(0, 10), 14, Palette.Text, 520);
             deskPcLog.alignment = TextAnchor.UpperLeft;
-            deskPcLog.rectTransform.sizeDelta = new Vector2(520, 260);
-            ButtonOn(deskPcPanel.transform, "Close", new Vector2(0, -170), () => game.CloseDeskPc(), 140, 32);
+            deskPcLog.rectTransform.sizeDelta = new Vector2(520, 300);
+            ButtonOn(deskPcBookPage.transform, "Back", new Vector2(0, -200), () => ShowDeskPcPage("home"), 140, 32);
             deskPcPanel.SetActive(false);
+            ShowDeskPcPage("home");
 
             bannerPanel = Panel("StoryBanner", canvasGo.transform, new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(620, 280));
             bannerAct = MakeText(bannerPanel.transform, "", new Vector2(0, 100), 14, Palette.Accent, 560);
@@ -362,7 +393,7 @@ namespace Vacancy
             clock.text = GameState.FormatClock(state.Hour);
             tod.text = GameState.TimeOfDayLabel(state.Hour);
             day.text = $"Day {state.Day}";
-            queue.text = $"Waiting {Economy.CountAtDesk(state)}";
+            queue.text = $"In {Economy.CountAtDesk(state)} · Out {Economy.CountWaitingCheckout(state)}";
             reputation.text = $"Rep {state.Reputation}";
             vacancy.text = state.VacancyOpen ? "VACANCY" : "NO VACANCY";
             radio.text = Media.RadioHudText(state);
@@ -580,29 +611,12 @@ namespace Vacancy
 
         void RefreshPhone()
         {
-            var atDesk = Economy.FirstAtDesk(state);
-            int waiting = Economy.CountAtDesk(state);
-            if (atDesk == null)
-            {
-                phoneArrivals.text = "No one is waiting to check in.";
-                phoneReview.interactable = false;
-                phoneReview.GetComponentInChildren<Text>().text = "No arrival";
-            }
-            else
-            {
-                int extra = waiting - 1;
-                phoneArrivals.text = extra > 0
-                    ? $"{atDesk.Name} is at the desk. {extra} more waiting."
-                    : $"{atDesk.Name} is at the desk.";
-                phoneReview.interactable = true;
-                phoneReview.GetComponentInChildren<Text>().text = "Review arrival";
-            }
-
-            phoneRequests.text = "No guest requests yet.";
+            phoneRequests.text = "No guest requests yet.\nUse the desk PC to check guests in and out.";
         }
 
         public void ShowDeskPc()
         {
+            ShowDeskPcPage("home");
             RefreshDeskPc();
             deskPcPanel.SetActive(true);
         }
@@ -610,11 +624,51 @@ namespace Vacancy
         public void HideDeskPc()
         {
             deskPcPanel.SetActive(false);
+            deskPcPage = "home";
+        }
+
+        public void ShowDeskPcPage(string page)
+        {
+            deskPcPage = page ?? "home";
+            if (deskPcHomePage != null) deskPcHomePage.SetActive(deskPcPage == "home");
+            if (deskPcCheckoutPage != null) deskPcCheckoutPage.SetActive(deskPcPage == "checkout");
+            if (deskPcBookPage != null) deskPcBookPage.SetActive(deskPcPage == "book");
+            RefreshDeskPc();
         }
 
         void RefreshDeskPc()
         {
-            var lines = new List<string> { "Guest book — rooms currently occupied." };
+            int checkIn = Economy.CountAtDesk(state);
+            int checkOut = Economy.CountWaitingCheckout(state);
+            if (deskPcCheckInBtn != null)
+            {
+                deskPcCheckInBtn.interactable = checkIn > 0;
+                deskPcCheckInBtn.GetComponentInChildren<Text>().text = $"Check in ({checkIn})";
+            }
+
+            if (deskPcCheckOutBtn != null)
+            {
+                deskPcCheckOutBtn.interactable = checkOut > 0;
+                deskPcCheckOutBtn.GetComponentInChildren<Text>().text = $"Check out ({checkOut})";
+            }
+
+            var leaving = Economy.FirstWaitingCheckout(state);
+            if (deskPcCheckoutInfo != null)
+            {
+                if (leaving == null)
+                {
+                    deskPcCheckoutInfo.text = "Nobody is waiting to check out.";
+                    if (deskPcCheckoutAction != null) deskPcCheckoutAction.interactable = false;
+                }
+                else
+                {
+                    deskPcCheckoutInfo.text =
+                        $"{leaving.Name} is at the desk. Process payment and complete their stay — they will walk to their car.";
+                    if (deskPcCheckoutAction != null) deskPcCheckoutAction.interactable = true;
+                }
+            }
+
+            var lines = new List<string> { "Occupied rooms." };
             int staying = 0;
             foreach (var room in state.Rooms)
             {
@@ -629,7 +683,7 @@ namespace Vacancy
             if (staying == 0) lines.Add("No guests staying.");
             lines.Add("");
             lines.Add("Supplies and hiring still go through the office PC.");
-            deskPcLog.text = string.Join("\n", lines);
+            if (deskPcLog != null) deskPcLog.text = string.Join("\n", lines);
         }
 
         void RefreshDesk()

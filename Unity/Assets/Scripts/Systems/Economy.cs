@@ -96,6 +96,34 @@ namespace Vacancy
             return n;
         }
 
+        public static Guest FirstWaitingCheckout(GameState state)
+        {
+            foreach (var guest in state.ActiveGuests)
+            {
+                if (guest.Phase == "waiting_checkout") return guest;
+            }
+
+            return null;
+        }
+
+        public static int CountWaitingCheckout(GameState state)
+        {
+            int n = 0;
+            foreach (var guest in state.ActiveGuests)
+            {
+                if (guest.Phase == "waiting_checkout") n++;
+            }
+
+            return n;
+        }
+
+        public static void BuyNewspaper(GameState state, string name)
+        {
+            int price = GameConfig.NewspaperPrice;
+            state.Money += price;
+            state.AddLog($"{name} bought a newspaper (−${price} / +${price} till).");
+        }
+
         public static int CountInboundWaiting(GameState state)
         {
             int n = 0;
@@ -320,6 +348,55 @@ namespace Vacancy
 
                     if (Pathing.FollowPath(guest, dt, state.Rooms, layout, null, speed))
                     {
+                        guest.PaperOffered = true;
+                        if (!guest.BoughtPaper && GameRng.NextFloat() < GameConfig.GuestPaperChance)
+                        {
+                            guest.ArrivePhase = "buying_paper";
+                            guest.Path = Pathing.PathToNewspaper(layout, guest.X, guest.Y, LobbyWalkOptions(state, guest));
+                        }
+                        else
+                        {
+                            guest.ArrivePhase = "waiting";
+                            guest.Path.Clear();
+                            LogDeskArrival(state, guest);
+                        }
+                    }
+
+                    continue;
+                }
+
+                if (phase == "buying_paper")
+                {
+                    if (guest.Path == null || guest.Path.Count == 0)
+                    {
+                        guest.Path = Pathing.PathToNewspaper(layout, guest.X, guest.Y, LobbyWalkOptions(state, guest));
+                    }
+
+                    if (guest.Path == null || guest.Path.Count == 0 ||
+                        Pathing.FollowPath(guest, dt, state.Rooms, layout, null, speed) ||
+                        Geometry.Dist(guest.X, guest.Y, layout.NewspaperApproach().X, layout.NewspaperApproach().Y) < 14f)
+                    {
+                        BuyNewspaper(state, guest.Name);
+                        guest.BoughtPaper = true;
+                        guest.ArrivePhase = "returning_from_paper";
+                        var slot = layout.CheckInLineSlot(CountAtDesk(state));
+                        guest.Path = Pathing.FindPath(layout, guest.X, guest.Y, slot, LobbyWalkOptions(state, guest));
+                    }
+
+                    continue;
+                }
+
+                if (phase == "returning_from_paper")
+                {
+                    var slot = layout.CheckInLineSlot(CountAtDesk(state));
+                    if (guest.Path == null || guest.Path.Count == 0)
+                    {
+                        guest.Path = Pathing.FindPath(layout, guest.X, guest.Y, slot, LobbyWalkOptions(state, guest));
+                    }
+
+                    if (Pathing.FollowPath(guest, dt, state.Rooms, layout, null, speed) ||
+                        Geometry.Dist(guest.X, guest.Y, slot.X, slot.Y) < 12f)
+                    {
                         guest.ArrivePhase = "waiting";
                         guest.Path.Clear();
                         LogDeskArrival(state, guest);
@@ -490,7 +567,9 @@ namespace Vacancy
                 NextIntervalPaymentIn = GameConfig.StayIntervalHours,
                 HasHiddenDamage = cleanRoom.HasHiddenDamage,
                 StallIndex = waiting.StallIndex,
-                CarColor = waiting.CarColor
+                CarColor = waiting.CarColor,
+                BoughtPaper = waiting.BoughtPaper,
+                PaperOffered = waiting.PaperOffered
             });
 
             string dayWord = stayDays == 1 ? "day" : "days";
@@ -606,15 +685,6 @@ namespace Vacancy
 
         public static string HandleDeskAction(GameState state, HotelLayout layout, List<StaffNpc> staffList)
         {
-            foreach (var guest in state.ActiveGuests)
-            {
-                if (guest.Phase == "waiting_checkout")
-                {
-                    CheckOutAtDesk(state, layout);
-                    return "checkout";
-                }
-            }
-
             foreach (var staff in staffList)
             {
                 if (staff != null && (staff.Phase == "waiting_pay" || staff.Phase == "to_desk"))
@@ -624,13 +694,13 @@ namespace Vacancy
                 }
             }
 
-            if (FirstAtDesk(state) != null)
+            if (FirstWaitingCheckout(state) != null || FirstAtDesk(state) != null)
             {
-                state.AddLog("Arrivals wait on the desk phone.");
-                return "phone";
+                state.AddLog("Use the desk PC to check guests in and out.");
+                return "deskpc";
             }
 
-            state.AddLog("Desk is clear. Flip the vacancy sign at the bottom (V or E).");
+            state.AddLog("Desk is clear. Flip the vacancy sign at the lot (V or E).");
             return null;
         }
 
@@ -740,6 +810,7 @@ namespace Vacancy
                             guest.Nav = null;
                             guest.Path.Clear();
                             state.AddLog($"{guest.Name} arrived at Room {guest.RoomId}.");
+                            MaybeQueueRoomPaperTrip(guest);
                         }
                     }
 
@@ -755,7 +826,27 @@ namespace Vacancy
                     guest.StayRemainingHours -= hoursPassed;
                     room.StayRemainingHours = guest.StayRemainingHours;
                     ProcessStayBilling(state, room, hoursPassed);
-                    if (guest.StayRemainingHours <= 0) BeginDeparture(state, layout, guest, room);
+                    if (guest.StayRemainingHours <= 0)
+                    {
+                        BeginDeparture(state, layout, guest, room);
+                        continue;
+                    }
+
+                    if (guest.PaperTripIn != null && guest.PaperTripIn > 0 && !guest.BoughtPaper)
+                    {
+                        guest.PaperTripIn -= hoursPassed;
+                        if (guest.PaperTripIn <= 0 && guest.StayRemainingHours > 2f)
+                        {
+                            BeginGuestPaperTrip(guest);
+                        }
+                    }
+
+                    continue;
+                }
+
+                if (guest.Phase == "buying_paper")
+                {
+                    UpdateGuestPaperTrip(state, layout, guest, dt, speed);
                     continue;
                 }
 
@@ -831,6 +922,96 @@ namespace Vacancy
         {
             if (guest.Nav == "enter_room" || guest.Nav == "exit_room") return guest.RoomId;
             return null;
+        }
+
+        static void MaybeQueueRoomPaperTrip(Guest guest)
+        {
+            if (guest == null || guest.BoughtPaper || guest.PaperTripIn != null) return;
+            if (GameRng.NextFloat() < GameConfig.GuestPaperInRoomChance)
+            {
+                guest.PaperTripIn = 0.4f + GameRng.NextFloat() * 1.6f;
+            }
+            else
+            {
+                guest.PaperTripIn = 0f;
+            }
+        }
+
+        static void BeginGuestPaperTrip(Guest guest)
+        {
+            guest.Phase = "buying_paper";
+            guest.Nav = "exit_room";
+            guest.Path.Clear();
+            guest.PaperTripIn = 0f;
+        }
+
+        static void UpdateGuestPaperTrip(GameState state, HotelLayout layout, Guest guest, float dt, float speed)
+        {
+            object allow = GuestAllowRoom(guest);
+            Pathing.ResolveRoomCollision(guest, state.Rooms, layout, allow);
+            var box = layout.NewspaperApproach();
+
+            if (guest.Nav == "exit_room")
+            {
+                var door = layout.RoomDoor(guest.RoomId);
+                Pathing.SteerTo(guest, door.X, door.Y, dt, state.Rooms, layout, guest.RoomId, speed);
+                if (Geometry.Dist(guest.X, guest.Y, door.X, door.Y) < 16)
+                {
+                    guest.Nav = "to_box";
+                    guest.Path = Pathing.PathToNewspaper(layout, guest.X, guest.Y);
+                }
+
+                return;
+            }
+
+            if (guest.Nav == "to_box")
+            {
+                if (guest.Path == null || guest.Path.Count == 0)
+                {
+                    guest.Path = Pathing.PathToNewspaper(layout, guest.X, guest.Y);
+                }
+
+                if (guest.Path == null || guest.Path.Count == 0 ||
+                    Pathing.FollowPath(guest, dt, state.Rooms, layout, null, speed) ||
+                    Geometry.Dist(guest.X, guest.Y, box.X, box.Y) < 14f)
+                {
+                    BuyNewspaper(state, guest.Name);
+                    guest.BoughtPaper = true;
+                    guest.Nav = "to_door";
+                    guest.Path = Pathing.PathToRoomDoor(layout, guest.X, guest.Y, guest.RoomId);
+                }
+
+                return;
+            }
+
+            if (guest.Nav == "to_door")
+            {
+                if (guest.Path == null || guest.Path.Count == 0)
+                {
+                    guest.Path = Pathing.PathToRoomDoor(layout, guest.X, guest.Y, guest.RoomId);
+                }
+
+                if (Pathing.FollowPath(guest, dt, state.Rooms, layout, null, speed))
+                {
+                    guest.Nav = "enter_room";
+                    guest.Path.Clear();
+                }
+
+                return;
+            }
+
+            var dest = layout.RoomInterior(guest.RoomId);
+            guest.TargetX = dest.X;
+            guest.TargetY = dest.Y;
+            Pathing.SteerTo(guest, dest.X, dest.Y, dt, state.Rooms, layout, guest.RoomId, speed);
+            if (Geometry.Dist(guest.X, guest.Y, dest.X, dest.Y) < 22)
+            {
+                guest.X = dest.X;
+                guest.Y = dest.Y;
+                guest.Phase = "in_room";
+                guest.Nav = null;
+                guest.Path.Clear();
+            }
         }
 
         public static void FinishInspection(GameState state, Room room, string byNpc = null)

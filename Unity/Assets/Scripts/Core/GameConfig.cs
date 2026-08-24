@@ -51,6 +51,9 @@ namespace Vacancy
         public const float ArrivalRepMaxMult = 1.85f;
         public const int CheckoutReputationBonus = 3;
         public const int MaxWaitingGuests = 3;
+        public const int NewspaperPrice = 1;
+        public const float GuestPaperChance = 0.22f;
+        public const float GuestPaperInRoomChance = 0.14f;
         public const float WaitPatienceHours = 4f;
         public const float StayIntervalHours = 12f;
         public const int MinStayDays = 1;

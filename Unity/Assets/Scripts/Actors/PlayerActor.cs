@@ -143,19 +143,11 @@ namespace Vacancy
             }
         }
 
-        public InteractTarget GetInteractTarget(List<Room> rooms, HotelLayout layout, List<StaffNpc> staffList, bool deskQueue = false, bool phoneQueue = false)
+        public InteractTarget GetInteractTarget(List<Room> rooms, HotelLayout layout, List<StaffNpc> staffList)
         {
-            _ = deskQueue;
             if (NearRadio(layout)) return new InteractTarget { Kind = "radio" };
-            if (NearPhone(layout)) return new InteractTarget { Kind = "phone" };
             if (NearDeskPc(layout)) return new InteractTarget { Kind = "deskpc" };
-
-            var phone = layout.DeskPhone;
-            if (phoneQueue && NearDesk(layout, staffList) && phone != null)
-            {
-                return new InteractTarget { Kind = "phone" };
-            }
-
+            if (NearPhone(layout)) return new InteractTarget { Kind = "phone" };
             if (NearNewspaper(layout)) return new InteractTarget { Kind = "newspaper" };
             if (NearDesk(layout, staffList)) return new InteractTarget { Kind = "desk" };
 
@@ -203,7 +195,7 @@ namespace Vacancy
         bool NearNewspaper(HotelLayout layout)
         {
             var paper = layout.Newspaper;
-            return paper != null && Geometry.Dist(X, Y, paper.X, paper.Y) < 46;
+            return paper != null && Geometry.Dist(X, Y, paper.X, paper.Y) < 36;
         }
 
         bool NearDesk(HotelLayout layout, List<StaffNpc> staffList)

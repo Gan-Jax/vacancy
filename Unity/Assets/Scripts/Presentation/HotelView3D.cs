@@ -119,6 +119,11 @@ namespace Vacancy
                     label = guest.UpsetCheckout ? $"{guest.Name} upset" : $"{guest.Name} out {waitLeft}h";
                     color = guest.UpsetCheckout ? Palette.Hex("#ff8f8f") : Palette.Accent;
                 }
+                else if (guest.Phase == "buying_paper")
+                {
+                    label = $"{guest.Name} paper";
+                    color = Palette.Paper;
+                }
 
                 float lookX = guest.Phase == "waiting_checkout" ? layout.FrontDesk.X : float.NaN;
                 float lookY = guest.Phase == "waiting_checkout" ? layout.FrontDesk.Y : float.NaN;
@@ -449,16 +454,6 @@ namespace Vacancy
                     Palette.RadioBody),
                 "radio");
 
-            var paper = layout.Newspaper;
-            MarkInteract(
-                Box(
-                    "Paper",
-                    new Rect(paper.X - paper.W / 2f, paper.Y - paper.H / 2f, paper.W, paper.H),
-                    1.02f,
-                    0.04f,
-                    Palette.Paper),
-                "newspaper");
-
             var phone = layout.DeskPhone;
             if (phone != null)
             {
@@ -561,6 +556,36 @@ namespace Vacancy
                 0.55f,
                 1.1f,
                 Palette.Hex("#2a2430"));
+
+            BuildNewspaperBox();
+        }
+
+        void BuildNewspaperBox()
+        {
+            var paper = layout.Newspaper;
+            if (paper == null) return;
+
+            var body = Box(
+                "NewspaperBox",
+                new Rect(paper.X - paper.W / 2f, paper.Y - paper.H / 2f, paper.W, paper.H),
+                0.62f,
+                1.16f,
+                Palette.Hex("#7a2e2e"));
+            MarkInteract(body, "newspaper");
+            Box(
+                "NewspaperWindow",
+                new Rect(paper.X - paper.W / 2f + 3f, paper.Y - paper.H / 2f + 3f, paper.W - 6f, 4f),
+                0.92f,
+                0.4f,
+                Palette.Paper,
+                false);
+            Box(
+                "NewspaperCap",
+                new Rect(paper.X - paper.W / 2f - 1f, paper.Y - paper.H / 2f - 1f, paper.W + 2f, paper.H + 2f),
+                1.22f,
+                0.08f,
+                Palette.Hex("#3a2430"),
+                false);
         }
 
         void BuildLights()
@@ -1429,7 +1454,7 @@ namespace Vacancy
         {
             foreach (var guest in state.ActiveGuests)
             {
-                if (guest.Phase == "waiting_checkout") return "Press E to check out guests";
+                if (guest.Phase == "waiting_checkout") return "Press E on the desk PC to check guests out";
             }
 
             foreach (var person in staff)
@@ -1440,7 +1465,7 @@ namespace Vacancy
                 }
             }
 
-            if (Economy.FirstAtDesk(state) != null) return "Press E on the phone to check them in";
+            if (Economy.FirstAtDesk(state) != null) return "Press E on the desk PC to check them in";
             return "Hold RMB to look · WASD walk · E interact · X pin · Esc pause · office door behind the desk to the basement";
         }
 

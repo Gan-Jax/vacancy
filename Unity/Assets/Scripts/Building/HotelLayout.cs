@@ -78,7 +78,7 @@ namespace Vacancy
                 FrontDesk = desk,
                 Departments = floor.Departments,
                 LobbyRadio = new DeskSpot { X = desk.X - desk.W / 2f - 26f, Y = desk.Y, W = 36, H = 28 },
-                Newspaper = new DeskSpot { X = desk.X, Y = desk.Y + 2f, W = 28, H = 18 },
+                Newspaper = PlaceNewspaperBox(floor, navGrid),
                 DeskPhone = new DeskSpot { X = desk.X - desk.W / 2f + 20f, Y = desk.Y - 2f, W = 18, H = 16 },
                 DeskPc = new DeskSpot { X = desk.X + desk.W / 2f - 22f, Y = desk.Y - 2f, W = 28, H = 18 },
                 DriveSouth = floor.DriveSouth,
@@ -142,6 +142,44 @@ namespace Vacancy
         public Point DeskApproach()
         {
             return new Point(FrontDesk.X, FrontDesk.Y + FrontDesk.H / 2f + 36f);
+        }
+
+        public Point NewspaperApproach()
+        {
+            if (Newspaper == null) return DeskApproach();
+            return new Point(Newspaper.X, Newspaper.Y + Newspaper.H / 2f + 18f);
+        }
+
+        static DeskSpot PlaceNewspaperBox(BuiltFloor floor, NavGrid grid)
+        {
+            const float w = 16f;
+            const float h = 14f;
+            float x = 12f * WorldScale.UnitsPerMeter;
+            float y = 65f * WorldScale.UnitsPerMeter;
+
+            if (!OnLotOrWalk(floor, x, y) && grid != null)
+            {
+                var cell = Navigation.NearestOpenCell(grid, x, y, null, 10f, 12);
+                if (cell.HasValue)
+                {
+                    var center = Navigation.CellCenter(grid, cell.Value.Col, cell.Value.Row);
+                    x = center.X;
+                    y = center.Y;
+                }
+            }
+
+            return new DeskSpot { X = x, Y = y, W = w, H = h };
+        }
+
+        static bool OnLotOrWalk(BuiltFloor floor, float x, float y)
+        {
+            if (floor == null) return false;
+            if (floor.PorteCochere.W > 0 && floor.PorteCochere.Contains(x, y)) return true;
+            if (floor.Parking.W > 0 && floor.Parking.Contains(x, y)) return true;
+            if (floor.WalkWest.W > 0 && floor.WalkWest.Contains(x, y)) return true;
+            if (floor.WalkNorth.W > 0 && floor.WalkNorth.Contains(x, y)) return true;
+            if (floor.DriveSouth.W > 0 && floor.DriveSouth.Contains(x, y, 8f)) return true;
+            return floor.Lobby.W > 0 && floor.Lobby.Contains(x, y, 18f);
         }
 
         public Point StaffHome(string key)
@@ -519,6 +557,11 @@ namespace Vacancy
                 if (DeskPc != null)
                 {
                     Consider("desk PC", new Rect(DeskPc.X - DeskPc.W / 2f, DeskPc.Y - DeskPc.H / 2f, DeskPc.W, DeskPc.H));
+                }
+
+                if (Newspaper != null)
+                {
+                    Consider("newspaper", new Rect(Newspaper.X - Newspaper.W / 2f, Newspaper.Y - Newspaper.H / 2f, Newspaper.W, Newspaper.H));
                 }
 
                 if (VacancySign != null)
