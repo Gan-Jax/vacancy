@@ -67,6 +67,8 @@ namespace Vacancy
                 else if (state.PcOpen) ClosePc();
                 else if (state.MediaOpen == "radio") CloseRadio();
                 else if (state.MediaOpen == "paper") ClosePaper();
+                else if (state.MediaOpen == "phone") ClosePhone();
+                else if (state.MediaOpen == "deskpc") CloseDeskPc();
                 else if (state.DeskGuest != null) CloseDeskReview();
                 else OpenPauseMenu();
             }
@@ -135,7 +137,8 @@ namespace Vacancy
         void HandleInteract()
         {
             if (state.PcOpen || player.ActiveTask != null) return;
-            bool deskQueue = state.WaitingGuests.Count > 0;
+            bool phoneQueue = state.WaitingGuests.Count > 0;
+            bool deskQueue = false;
             foreach (var guest in state.ActiveGuests)
             {
                 if (guest.Phase == "waiting_checkout")
@@ -145,7 +148,7 @@ namespace Vacancy
                 }
             }
 
-            var target = player.GetInteractTarget(state.Rooms, layout, StaffList(), deskQueue);
+            var target = player.GetInteractTarget(state.Rooms, layout, StaffList(), deskQueue, phoneQueue);
             if (target == null) return;
 
             if (target.Kind == "radio")
@@ -160,10 +163,22 @@ namespace Vacancy
                 return;
             }
 
+            if (target.Kind == "phone")
+            {
+                OpenPhone();
+                return;
+            }
+
+            if (target.Kind == "deskpc")
+            {
+                OpenDeskPc();
+                return;
+            }
+
             if (target.Kind == "desk")
             {
                 string result = Economy.HandleDeskAction(state, layout, StaffList());
-                if (result == Economy.DeskReview) OpenDeskReview();
+                if (result == "phone") OpenPhone();
                 return;
             }
 
@@ -378,6 +393,42 @@ namespace Vacancy
             state.MediaOpen = null;
             if (!state.PauseMenuOpen && !state.PcOpen && state.DeskGuest == null) state.Paused = false;
             hud.HidePaper();
+        }
+
+        public void OpenPhone()
+        {
+            state.MediaOpen = "phone";
+            state.Paused = true;
+            hud.ShowPhone();
+        }
+
+        public void ClosePhone()
+        {
+            state.MediaOpen = null;
+            hud.HidePhone();
+            if (!state.PauseMenuOpen && !state.PcOpen && state.DeskGuest == null) state.Paused = false;
+        }
+
+        public void ReviewArrivalFromPhone()
+        {
+            if (state.WaitingGuests.Count == 0) return;
+            state.MediaOpen = null;
+            hud.HidePhone();
+            OpenDeskReview();
+        }
+
+        public void OpenDeskPc()
+        {
+            state.MediaOpen = "deskpc";
+            state.Paused = true;
+            hud.ShowDeskPc();
+        }
+
+        public void CloseDeskPc()
+        {
+            state.MediaOpen = null;
+            hud.HideDeskPc();
+            if (!state.PauseMenuOpen && !state.PcOpen && state.DeskGuest == null) state.Paused = false;
         }
 
         public void OpenDeskReview()

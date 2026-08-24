@@ -187,6 +187,40 @@ namespace Vacancy
                 0.04f,
                 Palette.Paper);
 
+            var phone = layout.DeskPhone;
+            if (phone != null)
+            {
+                Box(
+                    "PhoneBase",
+                    new Rect(phone.X - phone.W / 2f, phone.Y - phone.H / 2f, phone.W, phone.H),
+                    1.02f,
+                    0.08f,
+                    Palette.Hex("#1d2430"));
+                Box(
+                    "PhoneHandset",
+                    new Rect(phone.X - 10f, phone.Y - 4f, 20f, 8f),
+                    1.12f,
+                    0.06f,
+                    Palette.Hex("#c45c2a"));
+            }
+
+            var deskPc = layout.DeskPc;
+            if (deskPc != null)
+            {
+                Box(
+                    "DeskPc",
+                    new Rect(deskPc.X - deskPc.W / 2f, deskPc.Y - deskPc.H / 2f, deskPc.W, deskPc.H),
+                    1.05f,
+                    0.32f,
+                    Palette.Hex("#1a2030"));
+                Box(
+                    "DeskPcScreen",
+                    new Rect(deskPc.X - 10f, deskPc.Y - 4f, 20f, 8f),
+                    1.28f,
+                    0.18f,
+                    Palette.Hex("#7dffb2"));
+            }
+
             var lobby = layout.Lobby;
             float sitX = desk.X;
             float sitY = desk.Y + 100f;
@@ -495,7 +529,7 @@ namespace Vacancy
                 }
             }
 
-            if (state.WaitingGuests.Count > 0) return "Press E to review the arrival at the desk";
+            if (state.WaitingGuests.Count > 0) return "Press E on the phone to check them in";
             return "Hold RMB to look · WASD walk · E interact · Esc pause";
         }
 

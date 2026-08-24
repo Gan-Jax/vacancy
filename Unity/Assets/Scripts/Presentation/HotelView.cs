@@ -85,6 +85,20 @@ namespace Vacancy
             Quad("Paper", new Rect(paper.X - paper.W / 2f, paper.Y - paper.H / 2f, paper.W, paper.H), Palette.Paper, 6);
             Label("Paper", paper.X - 12, paper.Y - 4, Palette.Hex("#3a2818"), 8);
 
+            var phone = layout.DeskPhone;
+            if (phone != null)
+            {
+                Quad("Phone", new Rect(phone.X - phone.W / 2f, phone.Y - phone.H / 2f, phone.W, phone.H), Palette.Hex("#c45c2a"), 7);
+                Label("Phone", phone.X - 16, phone.Y + phone.H / 2f + 2, Palette.Hex("#dbc5a2"), 9);
+            }
+
+            var deskPc = layout.DeskPc;
+            if (deskPc != null)
+            {
+                Quad("DeskPc", new Rect(deskPc.X - deskPc.W / 2f, deskPc.Y - deskPc.H / 2f, deskPc.W, deskPc.H), Palette.Hex("#1a2030"), 7);
+                Label("PC", deskPc.X - 8, deskPc.Y + deskPc.H / 2f + 2, Palette.Hex("#7dffb2"), 9);
+            }
+
             var sign = layout.VacancySign;
             vacancyFill = Quad("Sign", new Rect(sign.X - sign.W / 2f, sign.Y - sign.H / 2f, sign.W, sign.H), Palette.Hex("#2f6b3a"), 5);
             vacancyLabel = Label("VACANCY", sign.X - 42, sign.Y - 8, Color.white, 14);
@@ -302,8 +316,8 @@ namespace Vacancy
                 }
             }
 
-            if (state.WaitingGuests.Count > 0) return "Press E to review the arrival at the desk";
-            return "E desk · E radio / paper · E office PC · V sign · R barricade";
+            if (state.WaitingGuests.Count > 0) return "Press E on the phone to check them in";
+            return "E phone / desk PC · E radio / paper · E office PC · V sign · Esc pause";
         }
 
         static Sprite MakeSquare()

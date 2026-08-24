@@ -309,7 +309,7 @@ namespace Vacancy
                     {
                         X = officeRect.X + officeRect.W / 2f,
                         Y = officeRect.Y + officeRect.H + staffAlley + deskH / 2f,
-                        W = Down(320),
+                        W = Down(160),
                         H = deskH
                     };
 

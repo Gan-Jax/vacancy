@@ -20,6 +20,8 @@ namespace Vacancy
         public Dictionary<string, DepartmentSpot> Departments;
         public DeskSpot LobbyRadio;
         public DeskSpot Newspaper;
+        public DeskSpot DeskPhone;
+        public DeskSpot DeskPc;
         public DeskSpot VacancySign;
         public Point Spawn;
 
@@ -47,8 +49,10 @@ namespace Vacancy
                 Office = floor.Office,
                 FrontDesk = desk,
                 Departments = floor.Departments,
-                LobbyRadio = new DeskSpot { X = desk.X - desk.W / 2f + 22f, Y = desk.Y - 4f, W = 36, H = 28 },
-                Newspaper = new DeskSpot { X = desk.X + 16f, Y = desk.Y + 2f, W = 28, H = 18 },
+                LobbyRadio = new DeskSpot { X = desk.X - desk.W / 2f - 26f, Y = desk.Y, W = 36, H = 28 },
+                Newspaper = new DeskSpot { X = desk.X, Y = desk.Y + 2f, W = 28, H = 18 },
+                DeskPhone = new DeskSpot { X = desk.X - desk.W / 2f + 20f, Y = desk.Y - 2f, W = 18, H = 16 },
+                DeskPc = new DeskSpot { X = desk.X + desk.W / 2f - 22f, Y = desk.Y - 2f, W = 28, H = 18 },
                 VacancySign = new DeskSpot { X = width / 2f, Y = height - 28f, W = 140, H = 36 },
                 Spawn = new Point(desk.X + 50f, desk.Y + 70f)
             };

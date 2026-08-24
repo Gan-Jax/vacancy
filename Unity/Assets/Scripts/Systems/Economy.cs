@@ -302,7 +302,11 @@ namespace Vacancy
                 }
             }
 
-            if (state.WaitingGuests.Count > 0) return DeskReview;
+            if (state.WaitingGuests.Count > 0)
+            {
+                state.AddLog("Arrivals wait on the desk phone.");
+                return "phone";
+            }
 
             state.AddLog("Desk is clear. Flip the vacancy sign at the bottom (V or E).");
             return null;

@@ -123,7 +123,7 @@ namespace Vacancy
             room.Worker = "player";
         }
 
-        public InteractTarget GetInteractTarget(List<Room> rooms, HotelLayout layout, List<StaffNpc> staffList, bool deskQueue = false)
+        public InteractTarget GetInteractTarget(List<Room> rooms, HotelLayout layout, List<StaffNpc> staffList, bool deskQueue = false, bool phoneQueue = false)
         {
             const float interactRange = 88f;
 
@@ -131,6 +131,18 @@ namespace Vacancy
             if (radio != null && Geometry.Dist(X, Y, radio.X, radio.Y) < 44)
             {
                 return new InteractTarget { Kind = "radio" };
+            }
+
+            var phone = layout.DeskPhone;
+            if (phone != null && Geometry.Dist(X, Y, phone.X, phone.Y) < 42)
+            {
+                return new InteractTarget { Kind = "phone" };
+            }
+
+            var deskPc = layout.DeskPc;
+            if (deskPc != null && Geometry.Dist(X, Y, deskPc.X, deskPc.Y) < 42)
+            {
+                return new InteractTarget { Kind = "deskpc" };
             }
 
             var desk = layout.FrontDesk;
@@ -146,15 +158,20 @@ namespace Vacancy
             }
 
             float deskRange = deskBusy ? 90f : 70f;
-            if (deskDist < deskRange && (deskBusy || deskQueue))
+            if (phoneQueue && deskDist < deskRange && phone != null)
             {
-                return new InteractTarget { Kind = "desk" };
+                return new InteractTarget { Kind = "phone" };
             }
 
             var paper = layout.Newspaper;
             if (paper != null && Geometry.Dist(X, Y, paper.X, paper.Y) < 46)
             {
                 return new InteractTarget { Kind = "newspaper" };
+            }
+
+            if (deskDist < deskRange && (deskBusy || deskQueue))
+            {
+                return new InteractTarget { Kind = "desk" };
             }
 
             if (deskDist < deskRange) return new InteractTarget { Kind = "desk" };
