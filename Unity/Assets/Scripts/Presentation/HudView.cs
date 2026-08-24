@@ -350,7 +350,6 @@ namespace Vacancy
                 rows.Add($"Pays for the room: {(why.PaysRent ? "Yes" : "No")}");
             }
 
-            rows.Add($"They will wait: {Mathf.Max(0, Mathf.FloorToInt(guest.WaitRemainingHours))}h more");
             deskWhy.text = string.Join("\n", rows);
 
             deskAdmit.interactable = why.BunksFree > 0;

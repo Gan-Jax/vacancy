@@ -396,8 +396,7 @@ export function drawWorld(ctx, state, layout, player, staffList = []) {
   for (let i = 0; i < state.waitingGuests.length; i++) {
     const guest = state.waitingGuests[i];
     const slot = layout.checkInLineSlot(i);
-    const waitLeft = Math.max(0, Math.ceil(guest.waitRemainingHours ?? 0));
-    const tag = i === 0 ? `${guest.name} ★${waitLeft}h` : `${guest.name} ${waitLeft}h`;
+    const tag = i === 0 ? `${guest.name} ★` : guest.name;
     drawCharacter(ctx, slot.x, slot.y, 13, "#e8a0bf", tag);
   }
 

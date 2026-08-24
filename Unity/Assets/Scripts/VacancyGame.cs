@@ -118,6 +118,7 @@ namespace Vacancy
             if (player == null || playerCam == null) return;
             playerCam.transform.position = WorldScale.ToWorld(player.X, player.Y, WorldScale.EyeHeight);
             playerCam.transform.rotation = Quaternion.Euler(player.Pitch, player.Yaw, 0f);
+            view?.SyncPlayer(player, Time.deltaTime);
         }
 
         void OnDestroy()

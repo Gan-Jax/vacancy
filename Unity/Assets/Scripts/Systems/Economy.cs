@@ -91,43 +91,7 @@ namespace Vacancy
 
         public static void ProcessWaitingGuests(GameState state, float hoursPassed)
         {
-            if (state.WaitingGuests.Count == 0) return;
-            var stillWaiting = new List<WaitingGuest>();
-            foreach (var guest in state.WaitingGuests)
-            {
-                guest.WaitRemainingHours -= hoursPassed;
-                if (guest.WaitRemainingHours > 0)
-                {
-                    stillWaiting.Add(guest);
-                    continue;
-                }
-
-                if (guest.Kind == GuestKind.Survivor)
-                {
-                    if (state.Story != null)
-                    {
-                        state.Story.Humanity = Math.Max(0, state.Story.Humanity - 6);
-                    }
-
-                    state.AddLog(
-                        $"{guest.Name} waited {GameConfig.WaitPatienceHours}h at the desk, then walked back out to the road alone.");
-                }
-                else if (guest.Kind == GuestKind.Wrong)
-                {
-                    state.AddLog($"{guest.Name} was gone from the lobby. Nobody saw them leave.");
-                }
-                else
-                {
-                    state.Reputation = Math.Max(0, state.Reputation - 3);
-                    state.AddLog(
-                        $"{guest.Name} left angry — waited over {GameConfig.WaitPatienceHours}h with no room. (−3 reputation)");
-                }
-
-                Story.Hook(state, "turnAway", guest);
-            }
-
-            state.WaitingGuests.Clear();
-            state.WaitingGuests.AddRange(stillWaiting);
+            // Arrivals stay at the desk until the player admits or turns them away.
         }
 
         public static bool ToggleVacancy(GameState state)

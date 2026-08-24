@@ -11,8 +11,9 @@ namespace Vacancy
         readonly Camera playerCamera;
         readonly Dictionary<Color, Material> materials = new Dictionary<Color, Material>();
         readonly Dictionary<int, Renderer> roomFloors = new Dictionary<int, Renderer>();
-        readonly Renderer vacancySign;
+        Renderer vacancySign;
         readonly List<CharacterView> characters = new List<CharacterView>();
+        CharacterModel playerBody;
         readonly Text hint;
         readonly Font font;
         readonly Mesh cubeMesh;
@@ -33,7 +34,14 @@ namespace Vacancy
             BuildInteriors();
             BuildFurniture();
             BuildLights();
+            playerBody = CharacterModel.BuildFirstPerson(root, playerCamera, Mat);
+            playerBody.Recolor(Palette.Player);
             hint = BuildHint(parent);
+        }
+
+        public void SyncPlayer(PlayerActor player, float dt)
+        {
+            playerBody?.SyncFirstPerson(player, dt);
         }
 
         public void Refresh(GameState state, PlayerActor player, List<StaffNpc> staff)
@@ -56,9 +64,8 @@ namespace Vacancy
             {
                 var guest = state.WaitingGuests[i];
                 var slot = layout.CheckInLineSlot(i);
-                int waitLeft = Mathf.Max(0, Mathf.CeilToInt(guest.WaitRemainingHours));
-                string tag = i == 0 ? $"{guest.Name} *{waitLeft}h" : $"{guest.Name} {waitLeft}h";
-                PlaceCharacter(used++, slot.X, slot.Y, Palette.Hex("#e8a0bf"), tag);
+                string tag = i == 0 ? $"{guest.Name} ★" : guest.Name;
+                PlaceCharacter(used++, slot.X, slot.Y, Palette.Hex("#e8a0bf"), tag, layout.FrontDesk.X, layout.FrontDesk.Y);
             }
 
             foreach (var guest in state.ActiveGuests)
@@ -83,7 +90,9 @@ namespace Vacancy
                     color = guest.UpsetCheckout ? Palette.Hex("#ff8f8f") : Palette.Accent;
                 }
 
-                PlaceCharacter(used++, guest.X, guest.Y, color, label);
+                float lookX = guest.Phase == "waiting_checkout" ? layout.FrontDesk.X : float.NaN;
+                float lookY = guest.Phase == "waiting_checkout" ? layout.FrontDesk.Y : float.NaN;
+                PlaceCharacter(used++, guest.X, guest.Y, color, label, lookX, lookY);
             }
 
             foreach (var person in staff)
@@ -96,7 +105,7 @@ namespace Vacancy
                 PlaceCharacter(used++, person.X, person.Y, Palette.Hex(person.Color), label);
             }
 
-            for (int i = used; i < characters.Count; i++) characters[i].Root.SetActive(false);
+            for (int i = used; i < characters.Count; i++) characters[i].Model.GameObject.SetActive(false);
 
             if (hint != null) hint.text = HintText(state, staff);
         }
@@ -290,36 +299,50 @@ namespace Vacancy
             return text;
         }
 
-        void PlaceCharacter(int index, float x, float y, Color color, string label)
+        void PlaceCharacter(int index, float x, float y, Color color, string label, float lookX = float.NaN, float lookY = float.NaN)
         {
             while (characters.Count <= index)
             {
-                var holder = new GameObject($"Char{characters.Count}").transform;
-                holder.SetParent(root, false);
-                var body = MeshObject("Body", holder, cylinderMesh, Vector3.zero, new Vector3(0.42f, 0.85f, 0.42f), Palette.Player);
-                body.transform.localPosition = new Vector3(0f, 0.85f, 0f);
+                var model = CharacterModel.BuildNpc(root, $"Char{characters.Count}", Mat, characters.Count % 2 == 1);
                 var tm = new GameObject("Label").AddComponent<TextMesh>();
-                tm.transform.SetParent(holder, false);
-                tm.transform.localPosition = new Vector3(0f, 2f, 0f);
+                tm.transform.SetParent(model.Root, false);
+                tm.transform.localPosition = new Vector3(0f, 1.85f, 0f);
                 tm.font = font;
                 tm.fontSize = 48;
-                tm.characterSize = 0.08f;
+                tm.characterSize = 0.055f;
                 tm.anchor = TextAnchor.LowerCenter;
                 tm.alignment = TextAlignment.Center;
                 tm.color = Palette.Text;
                 characters.Add(new CharacterView
                 {
-                    Root = holder.gameObject,
-                    Body = body.GetComponent<Renderer>(),
+                    Model = model,
+                    LastX = x,
+                    LastY = y,
+                    Yaw = 0f,
                     Label = tm
                 });
             }
 
             var view = characters[index];
-            view.Root.SetActive(true);
-            view.Root.transform.position = WorldScale.ToWorld(x, y, 0f);
-            view.Body.sharedMaterial = Mat(color);
+            view.Model.GameObject.SetActive(true);
+            view.Model.Recolor(color);
             view.Label.text = label;
+
+            float dx = x - view.LastX;
+            float dy = y - view.LastY;
+            if (dx * dx + dy * dy > 0.4f)
+            {
+                view.Yaw = Mathf.Atan2(dx, dy) * Mathf.Rad2Deg;
+            }
+            else if (!float.IsNaN(lookX))
+            {
+                view.Yaw = Mathf.Atan2(lookX - x, lookY - y) * Mathf.Rad2Deg;
+            }
+
+            view.LastX = x;
+            view.LastY = y;
+            view.Model.Place(x, y, view.Yaw, Time.deltaTime);
+
             if (playerCamera != null)
             {
                 var toCam = view.Label.transform.position - playerCamera.transform.position;
@@ -565,9 +588,11 @@ namespace Vacancy
 
         sealed class CharacterView
         {
-            public GameObject Root;
-            public Renderer Body;
+            public CharacterModel Model;
             public TextMesh Label;
+            public float LastX;
+            public float LastY;
+            public float Yaw;
         }
     }
 }

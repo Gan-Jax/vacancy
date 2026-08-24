@@ -115,8 +115,7 @@ namespace Vacancy
             {
                 var guest = state.WaitingGuests[i];
                 var slot = layout.CheckInLineSlot(i);
-                int waitLeft = Mathf.Max(0, Mathf.CeilToInt(guest.WaitRemainingHours));
-                string tag = i == 0 ? $"{guest.Name} *{waitLeft}h" : $"{guest.Name} {waitLeft}h";
+                string tag = i == 0 ? $"{guest.Name} *" : guest.Name;
                 PlaceCharacter(used++, slot.X, slot.Y, 13, Palette.Hex("#e8a0bf"), tag);
             }
 

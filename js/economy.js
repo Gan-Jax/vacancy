@@ -144,40 +144,8 @@ export function spawnArrival(state) {
   return true;
 }
 
-/** Guests leave the desk if not checked in before their patience runs out. */
-export function processWaitingGuests(state, hoursPassed) {
-  if (!state.waitingGuests.length) return;
-
-  const stillWaiting = [];
-  for (const guest of state.waitingGuests) {
-    guest.waitRemainingHours -= hoursPassed;
-    if (guest.waitRemainingHours > 0) {
-      stillWaiting.push(guest);
-      continue;
-    }
-
-    // Letting someone stand there until they give up is its own answer.
-    if (guest.kind === KIND.survivor) {
-      if (state.story) {
-        state.story.humanity = Math.max(0, state.story.humanity - 6);
-      }
-      addLog(
-        state,
-        `${guest.name} waited ${CONFIG.waitPatienceHours}h at the desk, then walked back out to the road alone.`
-      );
-    } else if (guest.kind === KIND.wrong) {
-      addLog(state, `${guest.name} was gone from the lobby. Nobody saw them leave.`);
-    } else {
-      state.reputation = Math.max(0, state.reputation - 3);
-      addLog(
-        state,
-        `${guest.name} left angry — waited over ${CONFIG.waitPatienceHours}h with no room. (−3 reputation)`
-      );
-    }
-    storyHook(state, "turnAway", { guest });
-  }
-  state.waitingGuests = stillWaiting;
-}
+/** Arrivals stay at the desk until the player admits or turns them away. */
+export function processWaitingGuests(state, hoursPassed) {}
 
 /** Flip the roadside Vacancy / No Vacancy sign. */
 export function toggleVacancy(state) {

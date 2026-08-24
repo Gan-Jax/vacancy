@@ -520,14 +520,6 @@ function refreshDeskReview() {
 
   // Deliberately no count of what is still hidden — the player has to decide
   // whether they have seen enough, which is the whole point of the mechanic.
-  rows.push(
-    whyRow(
-      "They will wait",
-      `${Math.max(0, Math.floor(guest.waitRemainingHours))}h more`,
-      guest.waitRemainingHours < 1.5
-    )
-  );
-
   deskWhyEl.innerHTML = rows.join("");
 
   const canAsk = why.questionsLeft > 0;
