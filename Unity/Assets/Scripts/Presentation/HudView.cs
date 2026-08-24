@@ -19,7 +19,9 @@ namespace Vacancy
         readonly Text radio;
         readonly Text inventory;
         readonly Text shelter;
-        readonly Text log;
+        readonly Foldout shopFold;
+        readonly Foldout logFold;
+        readonly ScrollBox logBox;
         readonly Button hireBob;
         readonly Button hireMary;
         readonly Button unlock;
@@ -37,8 +39,9 @@ namespace Vacancy
         readonly Text deskClaim;
         readonly Text deskSigns;
         readonly Text deskWhy;
-        readonly Text deskReply;
-        readonly Transform deskQuestionsRoot;
+        readonly ScrollBox deskReplyBox;
+        readonly RectTransform deskQuestionsRoot;
+        readonly Text deskAskHint;
         readonly Button deskAdmit;
         readonly List<GameObject> questionButtons = new List<GameObject>();
         WaitingGuest deskQuestionGuest;
@@ -89,18 +92,30 @@ namespace Vacancy
             inventory = MakeText(top.transform, "", new Vector2(200, -22), 12, Palette.Muted, 900);
             shelter = MakeText(top.transform, "", new Vector2(200, -42), 12, Palette.Accent, 900);
 
-            var shop = Panel("Shop", canvasGo.transform, new Vector2(1f, 0.5f), new Vector2(-150, -20), new Vector2(280, 420));
-            MakeText(shop.transform, "Front desk", new Vector2(0, 180), 18, Palette.Accent, 240);
-            vacancyBtn = ButtonOn(shop.transform, "Set: NO VACANCY", new Vector2(0, 130), () => game.ToggleVacancy());
-            hireBob = ButtonOn(shop.transform, $"Hire Bob — ${GameConfig.HireBobCost}", new Vector2(0, 70), () => game.HireBob());
-            hireMary = ButtonOn(shop.transform, $"Hire Mary — ${GameConfig.HireMaryCost}", new Vector2(0, 20), () => game.HireMary());
-            unlock = ButtonOn(shop.transform, "Unlock room", new Vector2(0, -30), () => game.UnlockNextRoom());
-            MakeText(shop.transform, "Inspect → Clean → Repair", new Vector2(0, -90), 13, Palette.Muted, 240);
+            shopFold = MakeFoldout(
+                "Shop",
+                canvasGo.transform,
+                new Vector2(1f, 1f),
+                new Vector2(-148, -140),
+                new Vector2(268, 40),
+                new Vector2(268, 340),
+                "Front desk");
+            vacancyBtn = ButtonOn(shopFold.Body, "Set: NO VACANCY", new Vector2(0, 112), () => game.ToggleVacancy());
+            hireBob = ButtonOn(shopFold.Body, $"Hire Bob — ${GameConfig.HireBobCost}", new Vector2(0, 60), () => game.HireBob());
+            hireMary = ButtonOn(shopFold.Body, $"Hire Mary — ${GameConfig.HireMaryCost}", new Vector2(0, 8), () => game.HireMary());
+            unlock = ButtonOn(shopFold.Body, "Unlock room", new Vector2(0, -44), () => game.UnlockNextRoom());
+            MakeText(shopFold.Body, "Inspect → Clean → Repair", new Vector2(0, -100), 13, Palette.Muted, 240);
 
-            var logPanel = Panel("Log", canvasGo.transform, new Vector2(0f, 0f), new Vector2(280, 110), new Vector2(540, 200));
-            MakeText(logPanel.transform, "Activity log", new Vector2(0, 80), 16, Palette.Accent, 500);
-            log = MakeText(logPanel.transform, "", new Vector2(0, -10), 13, Palette.Text, 500);
-            log.alignment = TextAnchor.UpperLeft;
+            logFold = MakeFoldout(
+                "Log",
+                canvasGo.transform,
+                new Vector2(0f, 0f),
+                new Vector2(220, 28),
+                new Vector2(420, 40),
+                new Vector2(540, 280),
+                "Activity log");
+            logBox = MakeScrollBox(logFold.Body, Vector2.zero, new Vector2(508, 216));
+            Stretch(logBox.Root.GetComponent<RectTransform>(), 0, 0, 0, 0);
 
             pcPanel = Panel("OfficePc", canvasGo.transform, new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(580, 560));
             MakeText(pcPanel.transform, "Office PC — Supply Orders", new Vector2(0, 250), 20, Palette.Accent, 520);
@@ -114,28 +129,30 @@ namespace Vacancy
             ButtonOn(pcPanel.transform, "Close", new Vector2(0, -250), () => game.ClosePc(), 140, 32);
             pcPanel.SetActive(false);
 
-            deskPanel = Panel("DeskReview", canvasGo.transform, new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(640, 620));
-            MakeText(deskPanel.transform, "Desk review", new Vector2(0, 280), 18, Palette.Accent, 580);
-            deskName = MakeText(deskPanel.transform, "", new Vector2(0, 248), 20, Palette.Text, 580);
-            deskClaim = MakeText(deskPanel.transform, "", new Vector2(0, 218), 14, Palette.Muted, 580);
-            deskSigns = MakeText(deskPanel.transform, "", new Vector2(0, 160), 13, Palette.Accent, 580);
+            deskPanel = Panel("DeskReview", canvasGo.transform, new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(640, 640));
+            deskPanel.AddComponent<RectMask2D>();
+            MakeText(deskPanel.transform, "Desk review", new Vector2(0, 292), 18, Palette.Accent, 580);
+            deskName = MakeText(deskPanel.transform, "", new Vector2(0, 260), 20, Palette.Text, 580);
+            deskClaim = MakeText(deskPanel.transform, "", new Vector2(0, 230), 14, Palette.Muted, 580);
+            deskSigns = MakeText(deskPanel.transform, "", new Vector2(0, 178), 13, Palette.Accent, 580);
             deskSigns.alignment = TextAnchor.UpperLeft;
-            deskSigns.rectTransform.sizeDelta = new Vector2(580, 70);
-            deskWhy = MakeText(deskPanel.transform, "", new Vector2(0, 70), 13, Palette.Text, 580);
+            deskSigns.rectTransform.sizeDelta = new Vector2(580, 56);
+            deskWhy = MakeText(deskPanel.transform, "", new Vector2(0, 112), 13, Palette.Text, 580);
             deskWhy.alignment = TextAnchor.UpperLeft;
-            deskWhy.rectTransform.sizeDelta = new Vector2(580, 80);
-            deskReply = MakeText(deskPanel.transform, "Ask something. Their answer stays here.", new Vector2(0, -20), 13, Palette.Text, 580);
-            deskReply.alignment = TextAnchor.UpperLeft;
-            deskReply.rectTransform.sizeDelta = new Vector2(580, 90);
+            deskWhy.rectTransform.sizeDelta = new Vector2(580, 64);
+            MakeText(deskPanel.transform, "What they said", new Vector2(0, 68), 13, Palette.Accent, 580);
+            deskReplyBox = MakeScrollBox(deskPanel.transform, new Vector2(0, -10), new Vector2(580, 120));
             deskQuestionsRoot = new GameObject("Questions", typeof(RectTransform)).transform;
             deskQuestionsRoot.SetParent(deskPanel.transform, false);
             var qRt = deskQuestionsRoot.GetComponent<RectTransform>();
             qRt.anchorMin = qRt.anchorMax = new Vector2(0.5f, 0.5f);
-            qRt.anchoredPosition = new Vector2(0, -130);
-            qRt.sizeDelta = new Vector2(580, 160);
-            deskAdmit = ButtonOn(deskPanel.transform, "Admit", new Vector2(-160, -270), () => game.AdmitDeskGuest(), 150, 34);
-            ButtonOn(deskPanel.transform, "Refuse", new Vector2(0, -270), () => game.RefuseDeskGuest(), 150, 34);
-            ButtonOn(deskPanel.transform, "Close", new Vector2(160, -270), () => game.CloseDeskReview(), 150, 34);
+            qRt.anchoredPosition = new Vector2(0, -148);
+            qRt.sizeDelta = new Vector2(580, 120);
+            deskAskHint = MakeText(deskPanel.transform, "", new Vector2(0, -228), 13, Palette.Muted, 580);
+            deskAskHint.alignment = TextAnchor.MiddleCenter;
+            deskAdmit = ButtonOn(deskPanel.transform, "Admit", new Vector2(-160, -278), () => game.AdmitDeskGuest(), 150, 34);
+            ButtonOn(deskPanel.transform, "Refuse", new Vector2(0, -278), () => game.RefuseDeskGuest(), 150, 34);
+            ButtonOn(deskPanel.transform, "Close", new Vector2(160, -278), () => game.CloseDeskReview(), 150, 34);
             deskPanel.SetActive(false);
 
             radioPanel = Panel("RadioLog", canvasGo.transform, new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(560, 480));
@@ -207,11 +224,12 @@ namespace Vacancy
             unlock.interactable = nextRoom && state.Money >= cost;
             unlock.GetComponentInChildren<Text>().text = nextRoom ? $"Unlock room — ${cost}" : "All rooms unlocked";
             vacancyBtn.GetComponentInChildren<Text>().text = state.VacancyOpen ? "Set: NO VACANCY" : "Set: VACANCY";
+            shopFold.SetSubtitle(state.VacancyOpen ? "VACANCY" : "NO VACANCY");
 
-            int take = Mathf.Min(8, state.Messages.Count);
             var lines = new List<string>();
-            for (int i = 0; i < take; i++) lines.Add("• " + state.Messages[i]);
-            log.text = string.Join("\n", lines);
+            foreach (var message in state.Messages) lines.Add("• " + message);
+            logBox.SetText(lines.Count == 0 ? "No activity yet." : string.Join("\n", lines));
+            logFold.SetSubtitle(state.Messages.Count == 0 ? "" : TrimPreview(state.Messages[0], 42));
 
             if (state.Shelter != null && state.Shelter.Unlocked && !pcShelterRows)
             {
@@ -222,6 +240,12 @@ namespace Vacancy
             pcPanel.SetActive(state.PcOpen);
 
             if (state.DeskGuest != null) RefreshDesk();
+            else
+            {
+                deskQuestionGuest = null;
+                deskQuestionStamp = -1;
+            }
+
             deskPanel.SetActive(state.DeskGuest != null);
 
             radioPanel.SetActive(state.MediaOpen == "radio");
@@ -307,7 +331,7 @@ namespace Vacancy
 
             if (guest.Replies.Count == 0)
             {
-                deskReply.text = "Ask something. Their answer stays here — not just in the log.";
+                deskReplyBox.SetText("Ask something. Their answer stays here — not just in the log.");
             }
             else
             {
@@ -317,7 +341,7 @@ namespace Vacancy
                     lines.Add($"You: {reply.Prompt}\n{guest.Name}: “{reply.Spoken}”");
                 }
 
-                deskReply.text = string.Join("\n\n", lines);
+                deskReplyBox.SetText(string.Join("\n\n", lines));
             }
 
             var signs = Arrivals.RevealedSigns(guest);
@@ -355,7 +379,7 @@ namespace Vacancy
             deskAdmit.interactable = why.BunksFree > 0;
             deskAdmit.GetComponentInChildren<Text>().text = why.BunksFree == 0 ? "No room ready" : "Admit";
 
-            int stamp = guest.QuestionsAsked * 17 + guest.AskedQuestionIds.Count;
+            int stamp = guest.QuestionsAsked * 17 + guest.AskedQuestionIds.Count + (why.QuestionsLeft > 0 ? 1 : 0);
             if (deskQuestionGuest != guest || deskQuestionStamp != stamp)
             {
                 deskQuestionGuest = guest;
@@ -370,16 +394,18 @@ namespace Vacancy
             questionButtons.Clear();
 
             var questions = Arrivals.DeskQuestions(state, guest);
-            if (questions.Count == 0)
+            bool showQuestions = canAsk && questions.Count > 0;
+            LayoutDeskConversation(showQuestions);
+
+            if (!showQuestions)
             {
-                var hint = MakeText(deskQuestionsRoot, canAsk ? "Nothing left to ask." : "They stop answering.",
-                    Vector2.zero, 13, Palette.Muted, 540);
-                questionButtons.Add(hint.gameObject);
+                deskAskHint.text = canAsk ? "Nothing left to ask." : "They stop answering.";
                 return;
             }
 
-            float y = 50f;
-            int shown = Mathf.Min(4, questions.Count);
+            deskAskHint.text = "";
+            float y = 36f;
+            int shown = Mathf.Min(3, questions.Count);
             for (int i = 0; i < shown; i++)
             {
                 var q = questions[i];
@@ -390,9 +416,24 @@ namespace Vacancy
                     if (state.DeskGuest == null) return;
                     game.AskDeskQuestion(captured);
                 }, 560, 32);
-                button.interactable = canAsk;
                 questionButtons.Add(button.gameObject);
-                y -= 36f;
+                y -= 38f;
+            }
+        }
+
+        void LayoutDeskConversation(bool showQuestions)
+        {
+            deskQuestionsRoot.gameObject.SetActive(showQuestions);
+            var replyRt = deskReplyBox.Root.GetComponent<RectTransform>();
+            if (showQuestions)
+            {
+                replyRt.anchoredPosition = new Vector2(0f, 2f);
+                replyRt.sizeDelta = new Vector2(580f, 110f);
+            }
+            else
+            {
+                replyRt.anchoredPosition = new Vector2(0f, -70f);
+                replyRt.sizeDelta = new Vector2(580f, 220f);
             }
         }
 
@@ -494,6 +535,98 @@ namespace Vacancy
             return go;
         }
 
+        Foldout MakeFoldout(
+            string name,
+            Transform parent,
+            Vector2 anchor,
+            Vector2 pos,
+            Vector2 closedSize,
+            Vector2 openSize,
+            string title)
+        {
+            var root = Panel(name, parent, anchor, pos, closedSize);
+            root.AddComponent<RectMask2D>();
+            var header = ButtonOn(root.transform, title + "  ▼", Vector2.zero, () => { }, closedSize.x - 12f, 32f);
+            var headerRt = header.GetComponent<RectTransform>();
+            headerRt.anchorMin = new Vector2(0.5f, 1f);
+            headerRt.anchorMax = new Vector2(0.5f, 1f);
+            headerRt.pivot = new Vector2(0.5f, 1f);
+            headerRt.anchoredPosition = new Vector2(0f, -4f);
+
+            var body = new GameObject("Body", typeof(RectTransform));
+            body.transform.SetParent(root.transform, false);
+            var bodyRt = body.GetComponent<RectTransform>();
+            bodyRt.anchorMin = Vector2.zero;
+            bodyRt.anchorMax = Vector2.one;
+            bodyRt.offsetMin = new Vector2(8f, 8f);
+            bodyRt.offsetMax = new Vector2(-8f, -44f);
+            body.SetActive(false);
+
+            var fold = new Foldout(root, body.transform, header.GetComponentInChildren<Text>(), title, closedSize, openSize);
+            header.onClick.AddListener(fold.Toggle);
+            fold.SetOpen(false);
+            return fold;
+        }
+
+        ScrollBox MakeScrollBox(Transform parent, Vector2 pos, Vector2 size)
+        {
+            var root = new GameObject("Scroll", typeof(RectTransform), typeof(Image), typeof(ScrollRect), typeof(RectMask2D));
+            root.transform.SetParent(parent, false);
+            var rt = root.GetComponent<RectTransform>();
+            rt.anchorMin = rt.anchorMax = new Vector2(0.5f, 0.5f);
+            rt.anchoredPosition = pos;
+            rt.sizeDelta = size;
+            root.GetComponent<Image>().color = new Color(0.08f, 0.1f, 0.14f, 0.7f);
+
+            var viewport = new GameObject("Viewport", typeof(RectTransform));
+            viewport.transform.SetParent(root.transform, false);
+            Stretch(viewport.GetComponent<RectTransform>(), 6, 6, 6, 6);
+
+            var content = new GameObject("Content", typeof(RectTransform), typeof(Text), typeof(ContentSizeFitter));
+            content.transform.SetParent(viewport.transform, false);
+            var contentRt = content.GetComponent<RectTransform>();
+            contentRt.anchorMin = new Vector2(0f, 1f);
+            contentRt.anchorMax = new Vector2(1f, 1f);
+            contentRt.pivot = new Vector2(0.5f, 1f);
+            contentRt.anchoredPosition = Vector2.zero;
+            contentRt.sizeDelta = new Vector2(0f, 20f);
+            var fitter = content.GetComponent<ContentSizeFitter>();
+            fitter.horizontalFit = ContentSizeFitter.FitMode.Unconstrained;
+            fitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+
+            var text = content.GetComponent<Text>();
+            text.font = font;
+            text.fontSize = 13;
+            text.color = Palette.Text;
+            text.alignment = TextAnchor.UpperLeft;
+            text.horizontalOverflow = HorizontalWrapMode.Wrap;
+            text.verticalOverflow = VerticalWrapMode.Overflow;
+            text.raycastTarget = false;
+
+            var scroll = root.GetComponent<ScrollRect>();
+            scroll.content = contentRt;
+            scroll.viewport = viewport.GetComponent<RectTransform>();
+            scroll.horizontal = false;
+            scroll.vertical = true;
+            scroll.movementType = ScrollRect.MovementType.Clamped;
+            scroll.scrollSensitivity = 24f;
+            return new ScrollBox(root, text, contentRt);
+        }
+
+        static void Stretch(RectTransform rt, float left, float bottom, float right, float top)
+        {
+            rt.anchorMin = Vector2.zero;
+            rt.anchorMax = Vector2.one;
+            rt.offsetMin = new Vector2(left, bottom);
+            rt.offsetMax = new Vector2(-right, -top);
+        }
+
+        static string TrimPreview(string value, int max)
+        {
+            if (string.IsNullOrEmpty(value)) return "";
+            return value.Length <= max ? value : value.Substring(0, max - 1) + "…";
+        }
+
         Text Stat(Transform parent, string value, float x, float y = 0)
         {
             return MakeText(parent, value, new Vector2(x, y), 16, Palette.Text, 140);
@@ -548,8 +681,75 @@ namespace Vacancy
             text.text = value;
             text.alignment = TextAnchor.MiddleLeft;
             text.horizontalOverflow = HorizontalWrapMode.Wrap;
-            text.verticalOverflow = VerticalWrapMode.Overflow;
+            text.verticalOverflow = VerticalWrapMode.Truncate;
             return text;
+        }
+
+        sealed class Foldout
+        {
+            readonly GameObject root;
+            readonly Transform body;
+            readonly Text header;
+            readonly string title;
+            readonly Vector2 closedSize;
+            readonly Vector2 openSize;
+            string subtitle = "";
+
+            public Transform Body => body;
+            public bool Open { get; private set; }
+
+            public Foldout(GameObject root, Transform body, Text header, string title, Vector2 closedSize, Vector2 openSize)
+            {
+                this.root = root;
+                this.body = body;
+                this.header = header;
+                this.title = title;
+                this.closedSize = closedSize;
+                this.openSize = openSize;
+            }
+
+            public void Toggle() => SetOpen(!Open);
+
+            public void SetOpen(bool open)
+            {
+                Open = open;
+                body.gameObject.SetActive(open);
+                root.GetComponent<RectTransform>().sizeDelta = open ? openSize : closedSize;
+                PaintHeader();
+            }
+
+            public void SetSubtitle(string value)
+            {
+                subtitle = value ?? "";
+                PaintHeader();
+            }
+
+            void PaintHeader()
+            {
+                string arrow = Open ? "▲" : "▼";
+                if (Open || string.IsNullOrEmpty(subtitle)) header.text = $"{title}  {arrow}";
+                else header.text = $"{title}  {arrow}   {subtitle}";
+            }
+        }
+
+        sealed class ScrollBox
+        {
+            public readonly GameObject Root;
+            readonly Text text;
+            readonly RectTransform content;
+
+            public ScrollBox(GameObject root, Text text, RectTransform content)
+            {
+                Root = root;
+                this.text = text;
+                this.content = content;
+            }
+
+            public void SetText(string value)
+            {
+                text.text = value ?? "";
+                LayoutRebuilder.ForceRebuildLayoutImmediate(content);
+            }
         }
     }
 }

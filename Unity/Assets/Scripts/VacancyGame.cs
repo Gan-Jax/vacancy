@@ -53,7 +53,7 @@ namespace Vacancy
         void Update()
         {
             if (state == null) return;
-            bool look = !state.Paused && !AnyModalOpen() && !bannerOpen;
+            bool look = !state.Paused && !AnyModalOpen() && !bannerOpen && Input.GetMouseButton(1);
             input.Poll(look);
             ApplyCursor(look);
             float dt = Mathf.Min(0.05f, Time.deltaTime);

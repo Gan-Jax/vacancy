@@ -479,7 +479,7 @@ namespace Vacancy
             }
 
             if (state.WaitingGuests.Count > 0) return "Press E to review the arrival at the desk";
-            return "Mouse look · WASD walk · E interact · P pause (unlocks mouse for buttons)";
+            return "Hold RMB to look · WASD walk · E interact · click Front desk / Activity log";
         }
 
         static Mesh BuildCube()
