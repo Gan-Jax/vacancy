@@ -270,33 +270,28 @@ namespace Vacancy
 
         void BuildStairwell(FloorArea area)
         {
-            Walls(area.Id, area.Rect, area.Doors, Palette.OfficeWall);
+            // Office already owns the shared east wall. Drawing it twice made the
+            // stairwell flicker. Keep north/south/west only, and keep steps inside
+            // the wall thickness.
+            Walls(area.Id, area.Rect, area.Doors, Palette.OfficeWall, 0f, "east");
             int steps = 10;
-            float stepW = area.Rect.W / steps;
+            float pad = layout.Tile;
+            float innerX = area.Rect.X + pad;
+            float innerY = area.Rect.Y + pad;
+            float innerW = area.Rect.W - pad * 2f;
+            float innerH = area.Rect.H - pad * 2f;
+            float stepW = innerW / steps;
             for (int i = 0; i < steps; i++)
             {
                 float t = 1f - (i + 0.5f) / steps;
                 float y = -t * WorldScale.FloorDepth;
                 Box(
                     $"Stair-{i}",
-                    new Rect(area.Rect.X + i * stepW, area.Rect.Y + 4f, stepW, area.Rect.H - 8f),
+                    new Rect(innerX + i * stepW, innerY, stepW, innerH),
                     y + 0.08f,
                     0.16f,
                     Palette.Hex(i % 2 == 0 ? "#5a5048" : "#4a443c"));
             }
-
-            Box(
-                "StairRailN",
-                new Rect(area.Rect.X, area.Rect.Y, area.Rect.W, 6f),
-                WorldScale.WallHeight * 0.35f,
-                0.9f,
-                Palette.Hex("#2a2430"));
-            Box(
-                "StairRailS",
-                new Rect(area.Rect.X, area.Rect.Y + area.Rect.H - 6f, area.Rect.W, 6f),
-                WorldScale.WallHeight * 0.35f,
-                0.9f,
-                Palette.Hex("#2a2430"));
         }
 
         void BuildFurniture()
@@ -631,12 +626,12 @@ namespace Vacancy
             }
         }
 
-        void Walls(string name, Rect rect, List<Door> doors, Color color, float yBottom = 0f)
+        void Walls(string name, Rect rect, List<Door> doors, Color color, float yBottom = 0f, string skipSide = null)
         {
-            AddSide(name + "-N", "north", rect, doors, color, yBottom);
-            AddSide(name + "-S", "south", rect, doors, color, yBottom);
-            AddSide(name + "-W", "west", rect, doors, color, yBottom);
-            AddSide(name + "-E", "east", rect, doors, color, yBottom);
+            if (skipSide != "north") AddSide(name + "-N", "north", rect, doors, color, yBottom);
+            if (skipSide != "south") AddSide(name + "-S", "south", rect, doors, color, yBottom);
+            if (skipSide != "west") AddSide(name + "-W", "west", rect, doors, color, yBottom);
+            if (skipSide != "east") AddSide(name + "-E", "east", rect, doors, color, yBottom);
         }
 
         void AddSide(string name, string side, Rect rect, List<Door> doors, Color color, float yBottom)
