@@ -19,8 +19,6 @@ namespace Vacancy
         readonly Text inspectBanner;
         readonly Text pinReadout;
         readonly Transform pinMarker;
-        readonly Transform hoverRoot;
-        readonly Text hoverLabel;
         readonly Text hoverScreen;
         readonly Font font;
         readonly Mesh cubeMesh;
@@ -47,7 +45,6 @@ namespace Vacancy
             inspectBanner = BuildInspectBanner(hint.transform.parent);
             pinReadout = BuildPinReadout(hint.transform.parent);
             pinMarker = BuildPinMarker();
-            BuildHoverLabel(out hoverRoot, out hoverLabel);
             hoverScreen = BuildCrosshairHover(hint.transform.parent);
         }
 
@@ -193,69 +190,15 @@ namespace Vacancy
 
         public void SetInteractHover(InteractHover marker)
         {
+            if (hoverScreen == null) return;
             if (marker == null)
             {
-                if (hoverRoot != null) hoverRoot.gameObject.SetActive(false);
-                if (hoverScreen != null) hoverScreen.gameObject.SetActive(false);
+                hoverScreen.gameObject.SetActive(false);
                 return;
             }
 
-            string caption = marker.Caption();
-            if (hoverLabel != null) hoverLabel.text = caption;
-            if (hoverScreen != null)
-            {
-                hoverScreen.text = caption;
-                hoverScreen.gameObject.SetActive(true);
-            }
-
-            if (hoverRoot == null) return;
-            Vector3 pos = marker.Anchor;
-            if (playerCamera != null)
-            {
-                Vector3 toCam = playerCamera.transform.position - pos;
-                if (toCam.sqrMagnitude > 0.0001f) pos += toCam.normalized * 0.1f;
-            }
-
-            hoverRoot.position = pos;
-            hoverRoot.gameObject.SetActive(true);
-            BillboardHover(hoverRoot);
-        }
-
-        void BuildHoverLabel(out Transform labelRoot, out Text label)
-        {
-            var go = new GameObject("InteractHoverLabel", typeof(RectTransform), typeof(Canvas));
-            go.transform.SetParent(root, false);
-            var canvas = go.GetComponent<Canvas>();
-            canvas.renderMode = RenderMode.WorldSpace;
-            canvas.worldCamera = playerCamera;
-            canvas.overrideSorting = true;
-            canvas.sortingOrder = 80;
-            var rt = go.GetComponent<RectTransform>();
-            rt.sizeDelta = new Vector2(240f, 48f);
-            rt.localScale = Vector3.one * 0.006f;
-
-            var textGo = new GameObject("Caption", typeof(RectTransform), typeof(Text), typeof(Outline));
-            textGo.transform.SetParent(go.transform, false);
-            var textRt = textGo.GetComponent<RectTransform>();
-            textRt.anchorMin = Vector2.zero;
-            textRt.anchorMax = Vector2.one;
-            textRt.offsetMin = Vector2.zero;
-            textRt.offsetMax = Vector2.zero;
-            var text = textGo.GetComponent<Text>();
-            text.font = font;
-            text.fontSize = 34;
-            text.alignment = TextAnchor.MiddleCenter;
-            text.color = Palette.Text;
-            text.horizontalOverflow = HorizontalWrapMode.Overflow;
-            text.verticalOverflow = VerticalWrapMode.Overflow;
-            text.raycastTarget = false;
-            var outline = textGo.GetComponent<Outline>();
-            outline.effectColor = new Color(0.04f, 0.05f, 0.07f, 0.92f);
-            outline.effectDistance = new Vector2(1.4f, -1.4f);
-
-            go.SetActive(false);
-            labelRoot = go.transform;
-            label = text;
+            hoverScreen.text = marker.Caption();
+            hoverScreen.gameObject.SetActive(true);
         }
 
         static void MarkInteract(Renderer renderer, string kind, int roomId = 0, Vector3? anchor = null)
@@ -292,14 +235,6 @@ namespace Vacancy
             {
                 target.rotation = Quaternion.LookRotation(toCam);
             }
-        }
-
-        void BillboardHover(Transform target)
-        {
-            if (playerCamera == null || target == null) return;
-            var cam = playerCamera.transform;
-            target.LookAt(target.position + cam.rotation * Vector3.forward, cam.rotation * Vector3.up);
-            target.Rotate(0f, 180f, 0f);
         }
 
         void BuildGround()
