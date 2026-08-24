@@ -246,7 +246,6 @@ namespace Vacancy
             int stall = FindFreeStall(state);
             if (stall < 0) return false;
 
-            var pose = layout.StallPose(stall);
             var highway = layout.HighwayEntry;
             var start = layout.DriveLaneCorner(highway.Y);
             string color = CarColors[GameRng.NextInt(0, CarColors.Length - 1)];
@@ -269,11 +268,7 @@ namespace Vacancy
                 Color = color,
                 Stage = "inbound",
                 Waypoint = 0,
-                Path = new List<Point>
-                {
-                    layout.DriveLaneCorner(pose.Car.Y),
-                    pose.Car
-                }
+                Path = layout.StallDriveIn(stall)
             });
             state.AddLog($"{guest.Name} is driving in from the highway.");
             return true;
@@ -378,11 +373,7 @@ namespace Vacancy
                             car.X = pose.Car.X;
                             car.Y = pose.Car.Y;
                             car.Waypoint = 0;
-                            car.Path = new List<Point>
-                            {
-                                layout.DriveLaneCorner(pose.Car.Y),
-                                layout.DriveLaneCorner(layout.HighwayEntry.Y)
-                            };
+                            car.Path = layout.StallDriveOut(guest.StallIndex);
                         }
                     }
 

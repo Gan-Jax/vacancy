@@ -182,7 +182,10 @@ namespace Vacancy
             float originY = Down(40);
             const int westCount = 8;
             const int northCount = 4;
-            float lobbyW = Down(280);
+            // Leftover bays beside the office were ~30 units; grow the lobby
+            // into unused dirt (west) and the drive (east) so both sides fill.
+            float lobbySide = Down(40);
+            float lobbyW = Down(280) + lobbySide * 2f;
             float lobbyH = Down(280);
             float canopyH = Down(80);
 
@@ -196,22 +199,23 @@ namespace Vacancy
                 walkWestY,
                 walkW,
                 westWing.Y + westWing.H - walkWestY);
-            var lobbyRect = new Rect(originX, westWing.Y + westWing.H, lobbyW, lobbyH);
+            var lobbyRect = new Rect(originX - lobbySide, westWing.Y + westWing.H, lobbyW, lobbyH);
             var parking = new Rect(
                 walkNorth.X + walkW,
                 walkNorth.Y + walkNorth.H,
                 northWing.X + northWing.W - (walkNorth.X + walkW),
                 lobbyRect.Y - (walkNorth.Y + walkNorth.H));
-            var canopy = new Rect(lobbyRect.X, lobbyRect.Y + lobbyRect.H, Down(440), canopyH);
+            var canopy = new Rect(lobbyRect.X, lobbyRect.Y + lobbyRect.H, Down(480), canopyH);
             var driveSouth = new Rect(
                 lobbyRect.X + lobbyRect.W,
                 lobbyRect.Y,
                 northWing.X + northWing.W - (lobbyRect.X + lobbyRect.W),
                 lobbyRect.H + canopyH);
 
+            float west = System.Math.Min(originX, lobbyRect.X);
             float east = northWing.X + northWing.W;
             float south = canopy.Y + canopy.H;
-            var bounds = new Rect(originX, originY, Down(east - originX), Down(south - originY));
+            var bounds = new Rect(west, originY, Down(east - west), Down(south - originY));
 
             var floor = new BuiltFloor
             {

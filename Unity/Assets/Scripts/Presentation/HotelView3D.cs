@@ -19,6 +19,7 @@ namespace Vacancy
         readonly Text inspectBanner;
         readonly Text pinReadout;
         readonly Transform pinMarker;
+        readonly TextMesh hoverLabel;
         readonly Font font;
         readonly Mesh cubeMesh;
         readonly Mesh cylinderMesh;
@@ -44,6 +45,7 @@ namespace Vacancy
             inspectBanner = BuildInspectBanner(hint.transform.parent);
             pinReadout = BuildPinReadout(hint.transform.parent);
             pinMarker = BuildPinMarker();
+            hoverLabel = BuildHoverLabel();
         }
 
         public void SyncPlayer(PlayerActor player, float dt)
@@ -186,6 +188,64 @@ namespace Vacancy
             }
         }
 
+        public void SetInteractHover(InteractHover marker)
+        {
+            if (hoverLabel == null) return;
+            if (marker == null)
+            {
+                hoverLabel.gameObject.SetActive(false);
+                return;
+            }
+
+            hoverLabel.text = marker.Caption();
+            hoverLabel.transform.position = marker.Anchor;
+            hoverLabel.gameObject.SetActive(true);
+            FaceCamera(hoverLabel.transform);
+        }
+
+        TextMesh BuildHoverLabel()
+        {
+            var go = new GameObject("InteractHoverLabel");
+            go.transform.SetParent(root, false);
+            var tm = go.AddComponent<TextMesh>();
+            tm.font = font;
+            tm.fontSize = 42;
+            tm.characterSize = 0.038f;
+            tm.anchor = TextAnchor.LowerCenter;
+            tm.alignment = TextAlignment.Center;
+            tm.color = Palette.Accent;
+            tm.text = "";
+            var renderer = go.GetComponent<MeshRenderer>();
+            if (renderer != null)
+            {
+                renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                renderer.receiveShadows = false;
+            }
+
+            go.SetActive(false);
+            return tm;
+        }
+
+        static void MarkInteract(Renderer renderer, string kind, int roomId = 0, Vector3? anchor = null)
+        {
+            if (renderer == null) return;
+            var marker = renderer.gameObject.AddComponent<InteractHover>();
+            marker.Kind = kind;
+            marker.RoomId = roomId;
+            var bounds = renderer.bounds;
+            marker.Anchor = anchor ?? new Vector3(bounds.center.x, bounds.max.y + 0.18f, bounds.center.z);
+        }
+
+        void FaceCamera(Transform target)
+        {
+            if (playerCamera == null || target == null) return;
+            var toCam = target.position - playerCamera.transform.position;
+            if (toCam.sqrMagnitude > 0.01f)
+            {
+                target.rotation = Quaternion.LookRotation(toCam);
+            }
+        }
+
         void BuildGround()
         {
             var lotRect = new Rect(-80, -80, layout.Width + 160, layout.Height + 160);
@@ -278,15 +338,21 @@ namespace Vacancy
             foreach (var planned in layout.Floor.Rooms)
             {
                 var inner = Inset(planned.Rect, layout.Tile);
+                var roomAnchor = WorldScale.ToWorld(planned.Center.X, planned.Center.Y, 1.55f);
                 roomFloors[planned.Id] = Box($"RoomFloor-{planned.Id}", inner, 0.05f, 0.08f, Palette.Locked);
+                MarkInteract(roomFloors[planned.Id], "room", planned.Id, roomAnchor);
                 Walls($"Room-{planned.Id}", planned.Rect, DoorList(planned.DoorOpening), Palette.Wall);
                 RoomWindow(planned);
-                Box(
-                    $"Bed-{planned.Id}",
-                    new Rect(inner.X + inner.W * 0.2f, inner.Y + inner.H * 0.25f, inner.W * 0.55f, inner.H * 0.4f),
-                    0.28f,
-                    0.4f,
-                    Palette.Hex("#3a455c"));
+                MarkInteract(
+                    Box(
+                        $"Bed-{planned.Id}",
+                        new Rect(inner.X + inner.W * 0.2f, inner.Y + inner.H * 0.25f, inner.W * 0.55f, inner.H * 0.4f),
+                        0.28f,
+                        0.4f,
+                        Palette.Hex("#3a455c")),
+                    "room",
+                    planned.Id,
+                    roomAnchor);
                 Box($"RoomRoof-{planned.Id}", planned.Rect, WorldScale.CeilingY, 0.08f, Palette.Hex("#1a2030"));
             }
 
@@ -373,70 +439,78 @@ namespace Vacancy
         void BuildFurniture()
         {
             var desk = layout.FrontDesk;
-            Box(
-                "Desk",
-                new Rect(desk.X - desk.W / 2f, desk.Y - desk.H / 2f, desk.W, desk.H),
-                0.5f,
-                1f,
-                Palette.Hex("#5a4030"));
+            MarkInteract(
+                Box(
+                    "Desk",
+                    new Rect(desk.X - desk.W / 2f, desk.Y - desk.H / 2f, desk.W, desk.H),
+                    0.5f,
+                    1f,
+                    Palette.Hex("#5a4030")),
+                "desk");
 
             var radio = layout.LobbyRadio;
-            Box(
-                "Radio",
-                new Rect(radio.X - radio.W / 2f, radio.Y - radio.H / 2f, radio.W, radio.H),
-                1.05f,
-                0.28f,
-                Palette.RadioBody);
+            MarkInteract(
+                Box(
+                    "Radio",
+                    new Rect(radio.X - radio.W / 2f, radio.Y - radio.H / 2f, radio.W, radio.H),
+                    1.05f,
+                    0.28f,
+                    Palette.RadioBody),
+                "radio");
 
             var paper = layout.Newspaper;
-            Box(
-                "Paper",
-                new Rect(paper.X - paper.W / 2f, paper.Y - paper.H / 2f, paper.W, paper.H),
-                1.02f,
-                0.04f,
-                Palette.Paper);
+            MarkInteract(
+                Box(
+                    "Paper",
+                    new Rect(paper.X - paper.W / 2f, paper.Y - paper.H / 2f, paper.W, paper.H),
+                    1.02f,
+                    0.04f,
+                    Palette.Paper),
+                "newspaper");
 
             var phone = layout.DeskPhone;
             if (phone != null)
             {
-                Box(
-                    "PhoneBase",
-                    new Rect(phone.X - phone.W / 2f, phone.Y - phone.H / 2f, phone.W, phone.H),
-                    1.02f,
-                    0.08f,
-                    Palette.Hex("#1d2430"));
-                Box(
-                    "PhoneHandset",
-                    new Rect(phone.X - 10f, phone.Y - 4f, 20f, 8f),
-                    1.12f,
-                    0.06f,
-                    Palette.Hex("#c45c2a"));
+                MarkInteract(
+                    Box(
+                        "PhoneBase",
+                        new Rect(phone.X - phone.W / 2f, phone.Y - phone.H / 2f, phone.W, phone.H),
+                        1.02f,
+                        0.08f,
+                        Palette.Hex("#1d2430")),
+                    "phone");
+                MarkInteract(
+                    Box(
+                        "PhoneHandset",
+                        new Rect(phone.X - 10f, phone.Y - 4f, 20f, 8f),
+                        1.12f,
+                        0.06f,
+                        Palette.Hex("#c45c2a")),
+                    "phone");
             }
 
             var deskPc = layout.DeskPc;
             if (deskPc != null)
             {
-                Box(
-                    "DeskPc",
-                    new Rect(deskPc.X - deskPc.W / 2f, deskPc.Y - deskPc.H / 2f, deskPc.W, deskPc.H),
-                    1.05f,
-                    0.32f,
-                    Palette.Hex("#1a2030"));
-                Box(
-                    "DeskPcScreen",
-                    new Rect(deskPc.X - 10f, deskPc.Y - 4f, 20f, 8f),
-                    1.28f,
-                    0.18f,
-                    Palette.Hex("#7dffb2"));
+                MarkInteract(
+                    Box(
+                        "DeskPc",
+                        new Rect(deskPc.X - deskPc.W / 2f, deskPc.Y - deskPc.H / 2f, deskPc.W, deskPc.H),
+                        1.05f,
+                        0.32f,
+                        Palette.Hex("#1a2030")),
+                    "deskpc");
+                MarkInteract(
+                    Box(
+                        "DeskPcScreen",
+                        new Rect(deskPc.X - 10f, deskPc.Y - 4f, 20f, 8f),
+                        1.28f,
+                        0.18f,
+                        Palette.Hex("#7dffb2")),
+                    "deskpc");
             }
 
             var lobby = layout.Lobby;
-            float sitX = desk.X;
-            float sitY = desk.Y + 42f;
-            Box("Rug", new Rect(sitX - 70, sitY - 28, 140, 56), 0.055f, 0.02f, Palette.Hex("#4a2f2a"));
-            Box("ChairWest", new Rect(sitX - 62, sitY - 18, 24, 36), 0.28f, 0.42f, Palette.Hex("#5c4a3a"));
-            Box("ChairEast", new Rect(sitX + 38, sitY - 18, 24, 36), 0.28f, 0.42f, Palette.Hex("#5c4a3a"));
-            Box("CoffeeTable", new Rect(sitX - 16, sitY - 12, 32, 24), 0.32f, 0.28f, Palette.Hex("#3a2a20"));
             Box("PlantSW", new Rect(lobby.X + 24, lobby.Y + lobby.H - 56, 22, 22), 0.55f, 1f, Palette.Hex("#2f5a3a"));
             Box("PlantSE", new Rect(lobby.X + lobby.W - 46, lobby.Y + lobby.H - 56, 22, 22), 0.55f, 1f, Palette.Hex("#2f5a3a"));
 
@@ -445,24 +519,30 @@ namespace Vacancy
                 var office = layout.Office.Rect;
                 float pcX = office.X + office.W * 0.72f;
                 float pcY = office.Center.Y;
-                Box(
-                    "PcDesk",
-                    new Rect(pcX - 28, pcY - 18, 56, 36),
-                    0.45f,
-                    0.9f,
-                    Palette.Hex("#2a3142"));
-                Box(
-                    "Pc",
-                    new Rect(pcX - 16, pcY - 8, 32, 16),
-                    1.05f,
-                    0.35f,
-                    Palette.Hex("#1a2030"));
-                Box(
-                    "PcScreen",
-                    new Rect(pcX - 12, pcY - 5, 24, 6),
-                    1.28f,
-                    0.22f,
-                    Palette.Hex("#7dffb2"));
+                MarkInteract(
+                    Box(
+                        "PcDesk",
+                        new Rect(pcX - 28, pcY - 18, 56, 36),
+                        0.45f,
+                        0.9f,
+                        Palette.Hex("#2a3142")),
+                    "office");
+                MarkInteract(
+                    Box(
+                        "Pc",
+                        new Rect(pcX - 16, pcY - 8, 32, 16),
+                        1.05f,
+                        0.35f,
+                        Palette.Hex("#1a2030")),
+                    "office");
+                MarkInteract(
+                    Box(
+                        "PcScreen",
+                        new Rect(pcX - 12, pcY - 5, 24, 6),
+                        1.28f,
+                        0.22f,
+                        Palette.Hex("#7dffb2")),
+                    "office");
             }
 
             var sign = layout.VacancySign;
@@ -472,6 +552,7 @@ namespace Vacancy
                 1.2f,
                 1.8f,
                 Palette.Hex("#2f6b3a"));
+            MarkInteract(vacancySign, "sign");
             Box(
                 "SignPost",
                 new Rect(sign.X - 4f, sign.Y - 4f, 8f, 8f),
@@ -500,7 +581,6 @@ namespace Vacancy
             sun.shadows = LightShadows.None;
 
             PointLight("LobbyLight", layout.Lobby.Center.X, layout.Lobby.Center.Y, 2.4f, 14f, 1.5f, new Color(1f, 0.86f, 0.7f));
-            PointLight("SeatingLight", layout.FrontDesk.X, layout.FrontDesk.Y + 42f, 2.2f, 10f, 1.1f, new Color(1f, 0.82f, 0.62f));
             PointLight("DeskLight", layout.FrontDesk.X, layout.FrontDesk.Y, 2.2f, 9f, 1.2f, new Color(1f, 0.9f, 0.75f));
             if (layout.Office != null)
             {
@@ -734,11 +814,7 @@ namespace Vacancy
 
             if (playerCamera != null)
             {
-                var toCam = view.Label.transform.position - playerCamera.transform.position;
-                if (toCam.sqrMagnitude > 0.01f)
-                {
-                    view.Label.transform.rotation = Quaternion.LookRotation(toCam);
-                }
+                FaceCamera(view.Label.transform);
             }
         }
 
@@ -787,22 +863,35 @@ namespace Vacancy
             Color color = Palette.Hex(string.IsNullOrEmpty(car.Color) ? "#4a5a6a" : car.Color);
             if (view.Body != null) view.Body.sharedMaterial = Mat(color);
 
-            float cx = car.X + HotelLayout.ParkedCarWidth / 2f;
-            float cy = car.Y + HotelLayout.ParkedCarHeight / 2f;
+            float bodyW = HotelLayout.ParkedCarWidth;
+            float bodyH = HotelLayout.ParkedCarHeight;
+            float parkedYaw = 0f;
+            if (car.StallIndex >= 0)
+            {
+                var pose = layout.StallPose(car.StallIndex);
+                parkedYaw = pose.Yaw;
+                if (car.Stage == "parked")
+                {
+                    HotelLayout.CarFootprint(pose, out _, out _, out bodyW, out bodyH);
+                }
+            }
+
+            float cx = car.X + bodyW / 2f;
+            float cy = car.Y + bodyH / 2f;
             view.Root.position = WorldScale.ToWorld(cx, cy, 0f);
 
             if (float.IsNaN(view.LastX))
             {
                 view.LastX = car.X;
                 view.LastY = car.Y;
-                view.Yaw = car.Stage == "parked" ? 0f : 90f;
+                view.Yaw = car.Stage == "parked" ? parkedYaw : 90f;
             }
 
             float dx = car.X - view.LastX;
             float dy = car.Y - view.LastY;
             if (car.Stage == "parked")
             {
-                view.Yaw = 0f;
+                view.Yaw = parkedYaw;
             }
             else if (dx * dx + dy * dy > 0.4f)
             {
@@ -991,7 +1080,7 @@ namespace Vacancy
             float thick = 8f;
             float x0 = floor.CornerMass.W > 0f ? floor.CornerMass.X : layout.Lobby.X;
             float y0 = floor.CornerMass.W > 0f ? floor.CornerMass.Y : layout.Lobby.Y;
-            float y1 = layout.Lobby.Y + layout.Lobby.H;
+            float y1 = layout.Lobby.Y;
             float x1 = x0;
             foreach (var room in floor.Rooms)
             {
@@ -1127,38 +1216,66 @@ namespace Vacancy
             float leaf = south.Width * 0.9f;
             float hingeX = south.Center.X - south.Width / 2f + 2f;
             float y0 = south.Center.Y - leaf;
-            Box(
-                "OfficeDoor",
-                new Rect(hingeX, y0, thick, leaf),
-                1.15f,
-                2.2f,
-                Palette.Hex("#5a4030"));
-            Box(
-                "OfficeDoorKnob",
-                new Rect(hingeX + thick, y0 + leaf * 0.45f, 3f, 4f),
-                1.05f,
-                0.08f,
-                Palette.Hex("#c4a574"));
+            MarkInteract(
+                Box(
+                    "OfficeDoor",
+                    new Rect(hingeX, y0, thick, leaf),
+                    1.15f,
+                    2.2f,
+                    Palette.Hex("#5a4030")),
+                "office");
+            MarkInteract(
+                Box(
+                    "OfficeDoorKnob",
+                    new Rect(hingeX + thick, y0 + leaf * 0.45f, 3f, 4f),
+                    1.05f,
+                    0.08f,
+                    Palette.Hex("#c4a574")),
+                "office");
         }
 
         void BuildParkingLot(Rect lot)
         {
             Box(lotId("Asphalt"), lot, 0.04f, 0.05f, Palette.Hex("#2a2c30"));
             float driveW = HotelLayout.ParkingDriveWidth;
-            float driveX = lot.X + (lot.W - driveW) / 2f;
-            Box(lotId("Drive"), new Rect(driveX, lot.Y, driveW, lot.H), 0.055f, 0.03f, Palette.Hex("#3a3d42"));
-
-            float stallH = HotelLayout.ParkingStallHeight;
-            float gap = HotelLayout.ParkingStallGap;
-            float westW = driveX - lot.X - 14f;
-            float eastX = driveX + driveW + 8f;
-            float eastW = lot.X + lot.W - eastX - 8f;
-            int stalls = 4;
-            for (int i = 0; i < stalls; i++)
+            float aisleY = layout.NorthAisleY;
+            float entryX = layout.DriveCenterX - driveW / 2f;
+            float westX = layout.WestAisleX - driveW / 2f;
+            if (aisleY > lot.Y + 8f && aisleY < lot.Y + lot.H)
             {
-                float y = lot.Y + 16f + i * (stallH + gap);
-                Box(lotId($"LineW-{i}"), new Rect(lot.X + 8f, y, westW, 2f), 0.07f, 0.02f, Palette.Hex("#c4c0b0"));
-                Box(lotId($"LineE-{i}"), new Rect(eastX, y, eastW, 2f), 0.07f, 0.02f, Palette.Hex("#c4c0b0"));
+                Box(lotId("AisleEW"), new Rect(lot.X, aisleY - 8f, lot.W, driveW * 0.55f), 0.055f, 0.03f, Palette.Hex("#3a3d42"));
+            }
+
+            float laneY = Mathf.Max(lot.Y, aisleY);
+            float laneH = lot.Y + lot.H - laneY;
+            if (laneH > 8f)
+            {
+                Box(lotId("DriveE"), new Rect(entryX, laneY, driveW, laneH), 0.055f, 0.03f, Palette.Hex("#3a3d42"));
+                if (westX + driveW < entryX - 8f)
+                {
+                    Box(lotId("DriveW"), new Rect(westX, laneY, driveW, laneH), 0.055f, 0.03f, Palette.Hex("#3a3d42"));
+                }
+            }
+
+            var line = Palette.Hex("#c4c0b0");
+            for (int i = 0; i < HotelLayout.StallCount; i++)
+            {
+                var pose = layout.StallPose(i);
+                HotelLayout.CarFootprint(pose, out float x, out float y, out float w, out float h);
+                float pad = 8f;
+                var slot = new Rect(x - pad, y - pad, w + pad * 2f, h + pad * 2f);
+                if (HotelLayout.IsNorthFacing(pose))
+                {
+                    Box(lotId($"LineN-{i}"), new Rect(slot.X, slot.Y + slot.H - 2f, slot.W, 2f), 0.07f, 0.02f, line);
+                    Box(lotId($"LineS-{i}"), new Rect(slot.X, slot.Y, 2f, slot.H), 0.07f, 0.02f, line);
+                    Box(lotId($"LineS2-{i}"), new Rect(slot.X + slot.W - 2f, slot.Y, 2f, slot.H), 0.07f, 0.02f, line);
+                }
+                else
+                {
+                    Box(lotId($"LineW-{i}"), new Rect(slot.X, slot.Y, slot.W, 2f), 0.07f, 0.02f, line);
+                    Box(lotId($"LineE-{i}"), new Rect(slot.X, slot.Y + slot.H - 2f, slot.W, 2f), 0.07f, 0.02f, line);
+                    Box(lotId($"LineNose-{i}"), new Rect(slot.X, slot.Y, 2f, slot.H), 0.07f, 0.02f, line);
+                }
             }
         }
 

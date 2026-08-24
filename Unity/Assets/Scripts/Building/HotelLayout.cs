@@ -34,14 +34,16 @@ namespace Vacancy
         public Rect DriveSouth;
         public Rect PorteCochere;
 
-        public const int StallCount = 8;
+        public const int StallCount = 12;
         public const float ParkingDriveWidth = 90f;
+        public const float ParkingStallDepth = 56f;
         public const float ParkingStallHeight = 54f;
         public const float ParkingStallGap = 10f;
         public const float ParkedCarWidth = 46f;
         public const float ParkedCarHeight = 22f;
 
         readonly Dictionary<string, DepartmentSpot> deptForStaff = new Dictionary<string, DepartmentSpot>();
+        StallPose[] stalls;
 
         public static HotelLayout Create(float width = 0f, float height = 0f)
         {
@@ -102,6 +104,7 @@ namespace Vacancy
             };
 
             foreach (var room in floor.Rooms) layout.RoomCenters.Add(room.Center);
+            layout.BuildStalls();
 
             if (floor.Departments.TryGetValue("housekeeping", out var housekeeping))
             {
@@ -165,7 +168,26 @@ namespace Vacancy
                 FrontDesk.Y + FrontDesk.H / 2f + 32 + row * 28);
         }
 
-        public float DriveCenterX => Parking.X + Parking.W / 2f;
+        public float DriveCenterX
+        {
+            get
+            {
+                float fromLobby = Lobby.W > 0
+                    ? Lobby.X + Lobby.W + ParkingDriveWidth / 2f + 12f
+                    : Parking.X + Parking.W / 2f;
+                float maxX = Parking.X + Parking.W - ParkingDriveWidth / 2f - 8f;
+                if (DriveSouth.W > 0)
+                {
+                    maxX = System.Math.Min(maxX, DriveSouth.X + DriveSouth.W - ParkingDriveWidth / 2f - 8f);
+                }
+
+                return System.Math.Min(fromLobby, maxX);
+            }
+        }
+
+        public float WestAisleX => Parking.X + ParkingStallDepth + 12f + ParkingDriveWidth / 2f;
+
+        public float NorthAisleY => Parking.Y + ParkingStallDepth + 18f;
 
         public Point HighwayEntry
         {
@@ -193,25 +215,178 @@ namespace Vacancy
 
         public Point DriveLaneCorner(float carY)
         {
-            return new Point(DriveCenterX - ParkedCarWidth / 2f, carY);
+            return DrivePoint(DriveCenterX, carY);
+        }
+
+        public Point DrivePoint(float centerX, float carY)
+        {
+            return new Point(centerX - ParkedCarWidth / 2f, carY);
         }
 
         public StallPose StallPose(int index)
         {
-            int row = index / 2;
-            bool west = index % 2 == 0;
-            float driveX = Parking.X + (Parking.W - ParkingDriveWidth) / 2f;
-            float eastX = driveX + ParkingDriveWidth + 8f;
-            float y = Parking.Y + 16f + row * (ParkingStallHeight + ParkingStallGap);
-            float carX = west ? Parking.X + 22f : eastX + 16f;
-            float carY = y + ParkingStallHeight * 0.45f;
-            float walkX = west ? carX + ParkedCarWidth + 16f : carX - 16f;
-            float walkY = carY + ParkedCarHeight / 2f;
+            if (stalls == null || stalls.Length == 0)
+            {
+                return default;
+            }
+
+            if (index < 0) index = 0;
+            if (index >= stalls.Length) index = stalls.Length - 1;
+            return stalls[index];
+        }
+
+        public List<Point> StallDriveIn(int index)
+        {
+            var pose = StallPose(index);
+            var path = new List<Point>();
+            if (IsNorthFacing(pose))
+            {
+                float aisleY = NorthAisleY;
+                path.Add(DriveLaneCorner(aisleY));
+                path.Add(new Point(pose.Car.X, aisleY));
+            }
+            else if (pose.Car.Y < NorthAisleY)
+            {
+                float aisleY = NorthAisleY;
+                path.Add(DriveLaneCorner(aisleY));
+                path.Add(DrivePoint(WestAisleX, aisleY));
+                path.Add(DrivePoint(WestAisleX, pose.Car.Y));
+            }
+            else
+            {
+                path.Add(DriveLaneCorner(pose.Car.Y));
+            }
+
+            path.Add(pose.Car);
+            return path;
+        }
+
+        public List<Point> StallDriveOut(int index)
+        {
+            var pose = StallPose(index);
+            var path = new List<Point>();
+            if (IsNorthFacing(pose))
+            {
+                float aisleY = NorthAisleY;
+                path.Add(new Point(pose.Car.X, aisleY));
+                path.Add(DriveLaneCorner(aisleY));
+            }
+            else if (pose.Car.Y < NorthAisleY)
+            {
+                float aisleY = NorthAisleY;
+                path.Add(DrivePoint(WestAisleX, pose.Car.Y));
+                path.Add(DrivePoint(WestAisleX, aisleY));
+                path.Add(DriveLaneCorner(aisleY));
+            }
+            else
+            {
+                path.Add(DriveLaneCorner(pose.Car.Y));
+            }
+
+            path.Add(DriveLaneCorner(HighwayEntry.Y));
+            return path;
+        }
+
+        public static bool IsNorthFacing(StallPose pose)
+        {
+            return System.Math.Abs(pose.Yaw) > 45f;
+        }
+
+        public static void CarFootprint(StallPose pose, out float x, out float y, out float w, out float h)
+        {
+            if (IsNorthFacing(pose))
+            {
+                w = ParkedCarHeight;
+                h = ParkedCarWidth;
+            }
+            else
+            {
+                w = ParkedCarWidth;
+                h = ParkedCarHeight;
+            }
+
+            x = pose.Car.X;
+            y = pose.Car.Y;
+        }
+
+        void BuildStalls()
+        {
+            var list = new List<StallPose>();
+            if (Floor != null && Floor.Rooms != null)
+            {
+                foreach (var room in Floor.Rooms)
+                {
+                    if (room.DoorSide == "east") list.Add(MakeWestStall(room));
+                }
+
+                foreach (var room in Floor.Rooms)
+                {
+                    if (room.DoorSide == "south") list.Add(MakeNorthStall(room));
+                }
+            }
+
+            NudgeNorthStalls(list);
+            stalls = list.Count > 0 ? list.ToArray() : new StallPose[0];
+        }
+
+        StallPose MakeWestStall(PlannedRoom room)
+        {
+            float walkEdge = Floor.WalkWest.W > 0f ? Floor.WalkWest.X + Floor.WalkWest.W : Parking.X;
+            float walkX = Floor.WalkWest.W > 0f
+                ? Floor.WalkWest.X + Floor.WalkWest.W * 0.55f
+                : walkEdge - 16f;
             return new StallPose
             {
-                Car = new Point(carX, carY),
-                WalkOut = new Point(walkX, walkY)
+                Car = new Point(walkEdge + 10f, room.Center.Y - ParkedCarHeight / 2f),
+                WalkOut = new Point(walkX, room.Center.Y),
+                Yaw = 0f
             };
+        }
+
+        StallPose MakeNorthStall(PlannedRoom room)
+        {
+            float walkSouth = Floor.WalkNorth.H > 0f ? Floor.WalkNorth.Y + Floor.WalkNorth.H : Parking.Y;
+            float walkY = Floor.WalkNorth.H > 0f
+                ? Floor.WalkNorth.Y + Floor.WalkNorth.H * 0.55f
+                : walkSouth - 16f;
+            return new StallPose
+            {
+                Car = new Point(room.Center.X - ParkedCarHeight / 2f, walkSouth + 10f),
+                WalkOut = new Point(room.Center.X, walkY),
+                Yaw = 90f
+            };
+        }
+
+        static void NudgeNorthStalls(List<StallPose> list)
+        {
+            const float pad = 10f;
+            for (int i = 0; i < list.Count; i++)
+            {
+                var pose = list[i];
+                if (!IsNorthFacing(pose)) continue;
+                CarFootprint(pose, out float nx, out float ny, out float nw, out float nh);
+                bool moved;
+                do
+                {
+                    moved = false;
+                    for (int j = 0; j < list.Count; j++)
+                    {
+                        if (j == i || IsNorthFacing(list[j])) continue;
+                        CarFootprint(list[j], out float wx, out float wy, out float ww, out float wh);
+                        if (nx + nw + pad <= wx || wx + ww + pad <= nx || ny + nh + pad <= wy || wy + wh + pad <= ny)
+                        {
+                            continue;
+                        }
+
+                        nx = wx + ww + pad;
+                        pose.Car = new Point(nx, pose.Car.Y);
+                        pose.WalkOut = new Point(nx + nw / 2f, pose.WalkOut.Y);
+                        list[i] = pose;
+                        moved = true;
+                        break;
+                    }
+                } while (moved);
+            }
         }
 
         public Point CheckoutLineSlot(int index)
@@ -395,5 +570,6 @@ namespace Vacancy
     {
         public Point Car;
         public Point WalkOut;
+        public float Yaw;
     }
 }
