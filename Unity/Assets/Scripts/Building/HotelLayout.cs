@@ -7,6 +7,8 @@ namespace Vacancy
         public float Width;
         public float Height;
         public Rect Building;
+        public Rect Parking;
+        public Rect WalkBounds;
         public BuiltFloor Floor;
         public NavGrid NavGrid;
         public float Tile;
@@ -27,10 +29,11 @@ namespace Vacancy
 
         readonly Dictionary<string, DepartmentSpot> deptForStaff = new Dictionary<string, DepartmentSpot>();
 
-        public static HotelLayout Create(float width = 1360f, float height = 820f)
+        public static HotelLayout Create(float width = 1360f, float height = 1100f)
         {
             var building = Floorplan.InnBuildingRect(Floorplan.FlagshipGround, width, height);
             var floor = Floorplan.CreateFloor(Floorplan.FlagshipGround, building);
+            var parking = Floorplan.AttachParking(floor, building, height);
             var navGrid = Navigation.Build(floor);
             var desk = floor.FrontDesk;
             var layout = new HotelLayout
@@ -38,6 +41,8 @@ namespace Vacancy
                 Width = width,
                 Height = height,
                 Building = building,
+                Parking = parking,
+                WalkBounds = floor.Bounds,
                 Floor = floor,
                 NavGrid = navGrid,
                 Tile = floor.Tile,
@@ -53,7 +58,13 @@ namespace Vacancy
                 Newspaper = new DeskSpot { X = desk.X, Y = desk.Y + 2f, W = 28, H = 18 },
                 DeskPhone = new DeskSpot { X = desk.X - desk.W / 2f + 20f, Y = desk.Y - 2f, W = 18, H = 16 },
                 DeskPc = new DeskSpot { X = desk.X + desk.W / 2f - 22f, Y = desk.Y - 2f, W = 28, H = 18 },
-                VacancySign = new DeskSpot { X = width / 2f, Y = height - 28f, W = 140, H = 36 },
+                VacancySign = new DeskSpot
+                {
+                    X = parking.Center.X - 80f,
+                    Y = parking.Y + parking.H - 48f,
+                    W = 140,
+                    H = 36
+                },
                 Spawn = new Point(desk.X + 50f, desk.Y + 70f)
             };
 

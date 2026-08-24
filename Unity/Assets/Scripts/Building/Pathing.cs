@@ -189,7 +189,7 @@ namespace Vacancy
 
         static void ClampToBuilding(IMover entity, HotelLayout layout)
         {
-            var b = layout.Building;
+            var b = layout.WalkBounds.W > 0 ? layout.WalkBounds : layout.Building;
             entity.X = Geometry.Clamp(entity.X, b.X + 4, b.X + b.W - 4);
             entity.Y = Geometry.Clamp(entity.Y, b.Y + 4, b.Y + b.H - 4);
         }

@@ -61,6 +61,11 @@ namespace Vacancy
                     Quad(area.Id, area.Rect, Palette.Hex("#4a3f52"), 1);
                     Label(area.Label, area.Rect.X + 10, area.Rect.Y + 8, Palette.Hex(area.Accent ?? "#e8edf5"), 12);
                 }
+                else if (area.Kind == AreaKind.Parking)
+                {
+                    Quad(area.Id, area.Rect, Palette.Hex("#2a2c30"), 0);
+                    Label("Parking", area.Rect.X + 16, area.Rect.Y + 14, Palette.Hex("#c4c0b0"), 13);
+                }
             }
 
             foreach (var planned in layout.Floor.Rooms)

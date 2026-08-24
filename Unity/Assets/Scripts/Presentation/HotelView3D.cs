@@ -145,6 +145,10 @@ namespace Vacancy
                     Box(area.Id + "-floor", Inset(area.Rect, layout.Tile), 0.05f, 0.08f, Palette.Hex("#4a3f52"));
                     Walls(area.Id, area.Rect, area.Doors, Palette.Wall);
                 }
+                else if (area.Kind == AreaKind.Parking)
+                {
+                    BuildParkingLot(area.Rect);
+                }
             }
 
             foreach (var planned in layout.Floor.Rooms)
@@ -296,6 +300,18 @@ namespace Vacancy
             if (layout.Office != null)
             {
                 PointLight("OfficeLight", layout.Office.X, layout.Office.Y, 2.1f, 8f, 1.05f, new Color(0.7f, 0.95f, 0.85f));
+            }
+
+            if (layout.Parking.W > 0)
+            {
+                PointLight(
+                    "ParkingLight",
+                    layout.Parking.Center.X,
+                    layout.Parking.Center.Y,
+                    3.2f,
+                    16f,
+                    1.15f,
+                    new Color(0.85f, 0.88f, 1f));
             }
 
             int corridorLights = 0;
@@ -452,6 +468,44 @@ namespace Vacancy
             Box(name, wallRect, WorldScale.WallHeight * 0.5f, WorldScale.WallHeight, color);
         }
 
+        void BuildParkingLot(Rect lot)
+        {
+            Box(lotId("Asphalt"), lot, 0.04f, 0.05f, Palette.Hex("#2a2c30"));
+            float driveW = 90f;
+            float driveX = lot.X + (lot.W - driveW) / 2f;
+            Box(lotId("Drive"), new Rect(driveX, lot.Y, driveW, lot.H), 0.055f, 0.03f, Palette.Hex("#3a3d42"));
+
+            float stallH = 54f;
+            float gap = 10f;
+            float westW = driveX - lot.X - 14f;
+            float eastX = driveX + driveW + 8f;
+            float eastW = lot.X + lot.W - eastX - 8f;
+            int stalls = 4;
+            for (int i = 0; i < stalls; i++)
+            {
+                float y = lot.Y + 16f + i * (stallH + gap);
+                Box(lotId($"LineW-{i}"), new Rect(lot.X + 8f, y, westW, 2f), 0.07f, 0.02f, Palette.Hex("#c4c0b0"));
+                Box(lotId($"LineE-{i}"), new Rect(eastX, y, eastW, 2f), 0.07f, 0.02f, Palette.Hex("#c4c0b0"));
+                if (i == 0 || i == 2)
+                {
+                    ParkedCar(lotId($"CarW-{i}"), lot.X + 22f, y + stallH * 0.45f, Palette.Hex(i == 0 ? "#4a5a6a" : "#6a3a38"));
+                }
+
+                if (i == 1)
+                {
+                    ParkedCar(lotId($"CarE-{i}"), eastX + 16f, y + stallH * 0.45f, Palette.Hex("#3a4a38"));
+                }
+            }
+        }
+
+        void ParkedCar(string name, float x, float y, Color color)
+        {
+            Box(name, new Rect(x, y, 46f, 22f), 0.42f, 0.7f, color);
+            Box(name + "Cabin", new Rect(x + 10f, y + 2f, 22f, 18f), 0.95f, 0.45f, Palette.Hex("#1a2030"));
+        }
+
+        static string lotId(string name) => "Parking-" + name;
+
         Renderer Box(string name, Rect rect, float yCenter, float height, Color color)
         {
             var go = MeshObject(
@@ -530,7 +584,7 @@ namespace Vacancy
             }
 
             if (state.WaitingGuests.Count > 0) return "Press E on the phone to check them in";
-            return "Hold RMB to look · WASD walk · E interact · Esc pause";
+            return "Hold RMB to look · WASD walk · E interact · Esc pause · walk out to the lot for the vacancy sign";
         }
 
         static Mesh BuildCube()

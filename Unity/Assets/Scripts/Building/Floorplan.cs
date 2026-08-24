@@ -9,6 +9,7 @@ namespace Vacancy
         public const string GuestRoom = "guestRoom";
         public const string Office = "office";
         public const string Department = "department";
+        public const string Parking = "parking";
     }
 
     public sealed class BandSpec
@@ -103,6 +104,7 @@ namespace Vacancy
         public int RoomsPerRow;
         public Point RoomSize;
         public Rect Lobby;
+        public Rect Parking;
         public OfficeSpot Office;
         public DeskSpot FrontDesk;
         public Dictionary<string, DepartmentSpot> Departments = new Dictionary<string, DepartmentSpot>();
@@ -134,7 +136,7 @@ namespace Vacancy
 
         static readonly HashSet<string> PublicKinds = new HashSet<string>
         {
-            AreaKind.Corridor, AreaKind.Lobby, AreaKind.Department
+            AreaKind.Corridor, AreaKind.Lobby, AreaKind.Department, AreaKind.Parking
         };
 
         static readonly DepartmentDef[] Departments =
@@ -159,15 +161,41 @@ namespace Vacancy
             }
         }
 
-        public static Rect InnBuildingRect(FloorSpec spec, float lotWidth, float lotHeight, float marginX = 48f, float marginY = 40f)
+        public static Rect InnBuildingRect(
+            FloorSpec spec,
+            float lotWidth,
+            float lotHeight,
+            float marginX = 48f,
+            float marginY = 40f,
+            float parkingDepth = 280f)
         {
             float tile = spec.Tile;
             float Down(float value) => (float)(System.Math.Floor(value / tile) * tile);
             float roomW = Down(spec.RoomSize.X);
             int cols = spec.MaxRoomsPerRow > 0 ? spec.MaxRoomsPerRow : 6;
             float innW = cols * roomW + Down(spec.SideCorridor) * 2f + Down(spec.Edge) * 2f;
-            float innH = Down(lotHeight - marginY - 68f);
+            float innH = Down(lotHeight - marginY - parkingDepth);
             return new Rect(Down((lotWidth - innW) / 2f), marginY, innW, innH);
+        }
+
+        public static Rect AttachParking(BuiltFloor floor, Rect building, float lotHeight)
+        {
+            float tile = floor.Tile;
+            float Down(float value) => (float)(System.Math.Floor(value / tile) * tile);
+            float y = building.Y + building.H;
+            float h = Down(lotHeight - y);
+            if (h < tile * 8f) h = tile * 20f;
+            var parking = new Rect(building.X, y, building.W, h);
+            floor.Areas.Add(new FloorArea
+            {
+                Id = "parking",
+                Kind = AreaKind.Parking,
+                Label = "Parking lot",
+                Rect = parking
+            });
+            floor.Parking = parking;
+            floor.Bounds = new Rect(building.X, building.Y, building.W, building.H + parking.H);
+            return parking;
         }
 
         public static BuiltFloor CreateFloor(FloorSpec spec, Rect bounds)

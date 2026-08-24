@@ -104,9 +104,9 @@ namespace Vacancy
             if (!Pathing.CollidesWithRooms(nextX, Y, Radius, rooms, layout, allow)) X = nextX;
             if (!Pathing.CollidesWithRooms(X, nextY, Radius, rooms, layout, allow)) Y = nextY;
 
-            var b = layout.Building;
-            X = Geometry.Clamp(X, b.X + 20, b.X + b.W - 20);
-            Y = Geometry.Clamp(Y, b.Y + 24, b.Y + b.H - 20);
+            var walk = layout.WalkBounds.W > 0 ? layout.WalkBounds : layout.Building;
+            X = Geometry.Clamp(X, walk.X + 20, walk.X + walk.W - 20);
+            Y = Geometry.Clamp(Y, walk.Y + 24, walk.Y + walk.H - 16);
             Pathing.ResolveRoomCollision(this, rooms, layout, allow);
             return null;
         }
@@ -196,7 +196,7 @@ namespace Vacancy
             }
 
             var sign = layout.VacancySign;
-            if (sign != null && Geometry.Dist(X, Y, sign.X, sign.Y) < 55)
+            if (sign != null && Geometry.Dist(X, Y, sign.X, sign.Y) < 72)
             {
                 return new InteractTarget { Kind = "sign" };
             }
