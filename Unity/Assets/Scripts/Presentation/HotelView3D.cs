@@ -88,6 +88,10 @@ namespace Vacancy
                     lookY = layout.FrontDesk.Y;
                     tag = deskIndex == 1 ? $"{guest.Name} ★" : guest.Name;
                 }
+                else
+                {
+                    PathLook(guest, ref lookX, ref lookY);
+                }
 
                 PlaceCharacter(used++, x, y, Palette.Hex("#e8a0bf"), tag, lookX, lookY, guest.FootY);
             }
@@ -116,6 +120,7 @@ namespace Vacancy
 
                 float lookX = guest.Phase == "waiting_checkout" ? layout.FrontDesk.X : float.NaN;
                 float lookY = guest.Phase == "waiting_checkout" ? layout.FrontDesk.Y : float.NaN;
+                if (guest.Phase != "waiting_checkout") PathLook(guest, ref lookX, ref lookY);
                 PlaceCharacter(used++, guest.X, guest.Y, color, label, lookX, lookY, guest.FootY);
             }
 
@@ -126,7 +131,21 @@ namespace Vacancy
                 if (person.Phase == "waiting_pay") label = $"{person.Name} pay ${person.WagesOwed}";
                 else if (person.Phase == "to_desk") label = $"{person.Name} ->pay";
                 else if (person.PaydayDue) label = $"{person.Name} payday";
-                PlaceCharacter(used++, person.X, person.Y, Palette.Hex(person.Color), label, float.NaN, float.NaN, person.FootY);
+
+                float lookX = float.NaN;
+                float lookY = float.NaN;
+                if (person.Phase == "waiting_pay")
+                {
+                    lookX = layout.FrontDesk.X;
+                    lookY = layout.FrontDesk.Y;
+                }
+                else
+                {
+                    PathLook(person, ref lookX, ref lookY);
+                    if (float.IsNaN(lookX)) StaffRoomLook(person, ref lookX, ref lookY);
+                }
+
+                PlaceCharacter(used++, person.X, person.Y, Palette.Hex(person.Color), label, lookX, lookY, person.FootY);
             }
 
             for (int i = used; i < characters.Count; i++) characters[i].Model.GameObject.SetActive(false);
@@ -617,6 +636,11 @@ namespace Vacancy
             return go.transform;
         }
 
+        const float MoveYawThresholdSq = 0.04f;
+        const float TeleportSq = 400f;
+        const float AimAheadSq = 36f;
+        const float TurnDegreesPerSecond = 360f;
+
         void PlaceCharacter(int index, float x, float y, Color color, string label, float lookX = float.NaN, float lookY = float.NaN, float footY = 0f)
         {
             while (characters.Count <= index)
@@ -637,24 +661,44 @@ namespace Vacancy
                     LastX = x,
                     LastY = y,
                     Yaw = 0f,
+                    HasFacing = false,
                     Label = tm
                 });
             }
 
             var view = characters[index];
+            bool wasHidden = !view.Model.GameObject.activeSelf;
             view.Model.GameObject.SetActive(true);
             view.Model.Recolor(color);
             view.Label.text = label;
 
             float dx = x - view.LastX;
             float dy = y - view.LastY;
-            if (dx * dx + dy * dy > 0.4f)
+            float movedSq = dx * dx + dy * dy;
+            bool teleport = wasHidden || movedSq > TeleportSq;
+            bool moving = !teleport && movedSq > MoveYawThresholdSq;
+
+            float targetYaw = view.Yaw;
+            bool haveTarget = false;
+            bool useLook = TryLayoutYaw(lookX - x, lookY - y, out var lookYaw);
+            if (useLook && moving && LookSq(lookX - x, lookY - y) <= AimAheadSq) useLook = false;
+            if (useLook)
             {
-                view.Yaw = Mathf.Atan2(dx, dy) * Mathf.Rad2Deg;
+                targetYaw = lookYaw;
+                haveTarget = true;
             }
-            else if (!float.IsNaN(lookX))
+            else if (moving && TryLayoutYaw(dx, dy, out var moveYaw))
             {
-                view.Yaw = Mathf.Atan2(lookX - x, lookY - y) * Mathf.Rad2Deg;
+                targetYaw = moveYaw;
+                haveTarget = true;
+            }
+
+            if (haveTarget)
+            {
+                view.Yaw = !view.HasFacing || teleport
+                    ? targetYaw
+                    : Mathf.MoveTowardsAngle(view.Yaw, targetYaw, TurnDegreesPerSecond * Time.deltaTime);
+                view.HasFacing = true;
             }
 
             view.LastX = x;
@@ -669,6 +713,39 @@ namespace Vacancy
                     view.Label.transform.rotation = Quaternion.LookRotation(toCam);
                 }
             }
+        }
+
+        static void PathLook(IMover mover, ref float lookX, ref float lookY)
+        {
+            if (!float.IsNaN(lookX) || mover?.Path == null || mover.Path.Count == 0) return;
+            lookX = mover.Path[0].X;
+            lookY = mover.Path[0].Y;
+        }
+
+        void StaffRoomLook(StaffNpc person, ref float lookX, ref float lookY)
+        {
+            if (!float.IsNaN(lookX) || person == null) return;
+            Room room = person.ActiveTask?.Room ?? person.TargetRoom;
+            if (room == null || layout.RoomCenters == null || room.Id < 1 || room.Id > layout.RoomCenters.Count)
+            {
+                return;
+            }
+
+            if (person.Phase != "working" && person.Phase != "enter_room") return;
+            var center = layout.RoomCenters[room.Id - 1];
+            lookX = center.X;
+            lookY = center.Y;
+        }
+
+        static float LookSq(float dx, float dy) => dx * dx + dy * dy;
+
+        static bool TryLayoutYaw(float dx, float dy, out float yaw)
+        {
+            yaw = 0f;
+            if (float.IsNaN(dx) || float.IsNaN(dy)) return false;
+            if (dx * dx + dy * dy < 0.01f) return false;
+            yaw = Mathf.Atan2(dx, dy) * Mathf.Rad2Deg;
+            return true;
         }
 
         void PlaceCar(int index, GuestCar car)
@@ -1151,6 +1228,7 @@ namespace Vacancy
             public float LastX;
             public float LastY;
             public float Yaw;
+            public bool HasFacing;
         }
 
         sealed class CarView

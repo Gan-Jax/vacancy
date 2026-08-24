@@ -42,6 +42,12 @@ namespace Vacancy
             mixer.SetInputWeight(1, walkWeight);
         }
 
+        void LateUpdate()
+        {
+            transform.localPosition = Vector3.zero;
+            transform.localRotation = Quaternion.identity;
+        }
+
         void OnDestroy()
         {
             if (graph.IsValid()) graph.Destroy();

@@ -22,6 +22,7 @@ namespace Vacancy
         readonly Transform leftLeg;
         readonly Transform rightLeg;
         readonly HumanMotionDriver motions;
+        readonly Transform visual;
         readonly bool firstPerson;
         readonly bool humanoid;
         Vector3 lastPos;
@@ -38,7 +39,8 @@ namespace Vacancy
             Transform rightLeg,
             HumanMotionDriver motions,
             bool firstPerson,
-            bool humanoid)
+            bool humanoid,
+            Transform visual = null)
         {
             Root = root;
             this.material = material;
@@ -49,6 +51,7 @@ namespace Vacancy
             this.leftLeg = leftLeg;
             this.rightLeg = rightLeg;
             this.motions = motions;
+            this.visual = visual != null && visual != root ? visual : null;
             this.firstPerson = firstPerson;
             this.humanoid = humanoid;
             lastPos = root.position;
@@ -100,8 +103,11 @@ namespace Vacancy
             var walk = set.Walk(feminine);
             if (prefab == null || idle == null || walk == null) return false;
 
-            var instance = UnityEngine.Object.Instantiate(prefab, parent);
-            instance.name = name;
+            var pivot = new GameObject(name).transform;
+            pivot.SetParent(parent, false);
+
+            var instance = UnityEngine.Object.Instantiate(prefab, pivot);
+            instance.name = "Body";
             instance.transform.localPosition = Vector3.zero;
             instance.transform.localRotation = Quaternion.identity;
 
@@ -127,7 +133,7 @@ namespace Vacancy
             if (firstPerson) HideFirstPersonHead(instance.transform);
 
             model = new CharacterModel(
-                instance.transform,
+                pivot,
                 null,
                 clothes,
                 clothingMats,
@@ -137,7 +143,8 @@ namespace Vacancy
                 null,
                 driver,
                 firstPerson,
-                humanoid: true);
+                humanoid: true,
+                instance.transform);
             return true;
         }
 
@@ -219,6 +226,7 @@ namespace Vacancy
             var pos = WorldScale.ToWorld(layoutX, layoutY, footY);
             Root.position = pos;
             if (!firstPerson) Root.rotation = Quaternion.Euler(0f, yawDegrees, 0f);
+            AlignVisual();
             Animate(pos, dt);
         }
 
@@ -229,7 +237,15 @@ namespace Vacancy
             var yaw = Quaternion.Euler(0f, player.Yaw, 0f);
             Root.position = humanoid ? pos - yaw * Vector3.forward * FirstPersonBack : pos;
             Root.rotation = yaw;
+            AlignVisual();
             Animate(pos, dt);
+        }
+
+        void AlignVisual()
+        {
+            if (visual == null) return;
+            visual.localPosition = Vector3.zero;
+            visual.localRotation = Quaternion.identity;
         }
 
         void Animate(Vector3 pos, float dt)
