@@ -1,0 +1,26 @@
+---
+description: Ship all game changes in Unity; leave the JS browser prototype alone
+alwaysApply: true
+---
+
+# Unity is the game now
+
+Until the user says otherwise, **Vacancy lives in `Unity/`**. Do not update the browser prototype.
+
+## Do not touch
+
+- `js/`
+- `index.html`
+- `css/`
+- any other web-prototype files
+
+Even when a task would be “the same change in JS and Unity,” make it **only in Unity**.
+
+## Do
+
+- Implement layout, story, HUD, pathing, arrivals, and playable behavior in `Unity/Assets/`
+- Keep Project RM (`hotel-simulator`) out of this repo; do not copy RM C#
+
+## Exception
+
+Edit the JS prototype only if the user explicitly asks to update it.
