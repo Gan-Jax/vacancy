@@ -134,6 +134,7 @@ namespace Vacancy
             playerCam.transform.position = WorldScale.ToWorld(player.X, player.Y, WorldScale.EyeHeight + player.FootY);
             playerCam.transform.rotation = Quaternion.Euler(player.Pitch, player.Yaw, 0f);
             view?.SyncPlayer(player, Time.deltaTime);
+            UpdateInteractHover();
         }
 
         void OnDestroy()
@@ -146,6 +147,55 @@ namespace Vacancy
         bool AnyModalOpen()
         {
             return state.PcOpen || state.DeskGuest != null || !string.IsNullOrEmpty(state.MediaOpen);
+        }
+
+        void UpdateInteractHover()
+        {
+            if (view == null || player == null || playerCam == null || state == null)
+            {
+                return;
+            }
+
+            if (state.Paused || state.PauseMenuOpen || AnyModalOpen() || bannerOpen || inspectMode)
+            {
+                view.SetInteractHover(null);
+                return;
+            }
+
+            var ray = playerCam.ViewportPointToRay(new Vector3(0.5f, 0.5f, 0f));
+            var marker = PickInteractHover(ray);
+            if (marker == null)
+            {
+                view.SetInteractHover(null);
+                return;
+            }
+
+            Room room = null;
+            if (marker.Kind == "room" && marker.RoomId > 0 && marker.RoomId <= state.Rooms.Count)
+            {
+                room = state.Rooms[marker.RoomId - 1];
+            }
+
+            if (!player.CanInteractWith(marker.Kind, room, layout, StaffList()))
+            {
+                view.SetInteractHover(null);
+                return;
+            }
+
+            view.SetInteractHover(marker);
+        }
+
+        InteractHover PickInteractHover(Ray ray)
+        {
+            var hits = Physics.RaycastAll(ray, 24f);
+            System.Array.Sort(hits, (a, b) => a.distance.CompareTo(b.distance));
+            foreach (var hit in hits)
+            {
+                if (IsCharacterHit(hit.collider)) continue;
+                return hit.collider != null ? hit.collider.GetComponent<InteractHover>() : null;
+            }
+
+            return null;
         }
 
         void HandleInteract()

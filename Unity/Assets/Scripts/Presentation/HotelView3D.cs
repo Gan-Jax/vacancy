@@ -236,6 +236,22 @@ namespace Vacancy
             marker.Anchor = anchor ?? new Vector3(bounds.center.x, bounds.max.y + 0.18f, bounds.center.z);
         }
 
+        void TryMarkRoomPart(string name, Renderer renderer)
+        {
+            if (renderer == null || string.IsNullOrEmpty(name) || !name.StartsWith("Room-")) return;
+            string rest = name.Substring(5);
+            int digits = 0;
+            while (digits < rest.Length && char.IsDigit(rest[digits])) digits++;
+            if (digits == 0 || !int.TryParse(rest.Substring(0, digits), out int roomId) || roomId < 1)
+            {
+                return;
+            }
+
+            if (layout.RoomCenters == null || roomId > layout.RoomCenters.Count) return;
+            var center = layout.RoomCenters[roomId - 1];
+            MarkInteract(renderer, "room", roomId, WorldScale.ToWorld(center.X, center.Y, 1.55f));
+        }
+
         void FaceCamera(Transform target)
         {
             if (playerCamera == null || target == null) return;
@@ -1176,7 +1192,7 @@ namespace Vacancy
             else if (side == "west") wallRect = new Rect(rect.X, from, thick, len);
             else wallRect = new Rect(rect.X + rect.W - thick, from, thick, len);
 
-            Box(name, wallRect, yBottom + WorldScale.WallHeight * 0.5f, WorldScale.WallHeight, color);
+            TryMarkRoomPart(name, Box(name, wallRect, yBottom + WorldScale.WallHeight * 0.5f, WorldScale.WallHeight, color));
         }
 
         void FrameOpening(string name, Door door, string side, Rect rect, Color color, float yBottom)
@@ -1192,13 +1208,15 @@ namespace Vacancy
             else opening = new Rect(rect.X + rect.W - thick, gap0, thick, door.Width);
 
             float lintelH = 0.55f;
-            Box(
-                name + "-lintel",
-                opening,
-                yBottom + WorldScale.WallHeight - lintelH * 0.5f,
-                lintelH,
-                color);
-            Box(name + "-sill", opening, yBottom + 0.055f, 0.05f, Palette.Doorway);
+            TryMarkRoomPart(
+                name,
+                Box(
+                    name + "-lintel",
+                    opening,
+                    yBottom + WorldScale.WallHeight - lintelH * 0.5f,
+                    lintelH,
+                    color));
+            TryMarkRoomPart(name, Box(name + "-sill", opening, yBottom + 0.055f, 0.05f, Palette.Doorway));
         }
 
         void HangOfficeDoor(FloorArea office)

@@ -126,98 +126,139 @@ namespace Vacancy
             room.Worker = "player";
         }
 
+        public bool CanInteractWith(string kind, Room room, HotelLayout layout, List<StaffNpc> staffList)
+        {
+            if (string.IsNullOrEmpty(kind) || layout == null) return false;
+            switch (kind)
+            {
+                case "radio": return NearRadio(layout);
+                case "phone": return NearPhone(layout);
+                case "deskpc": return NearDeskPc(layout);
+                case "newspaper": return NearNewspaper(layout);
+                case "desk": return NearDesk(layout, staffList);
+                case "office": return NearOffice(layout);
+                case "sign": return NearSign(layout);
+                case "room": return NearRoom(room, layout);
+                default: return false;
+            }
+        }
+
         public InteractTarget GetInteractTarget(List<Room> rooms, HotelLayout layout, List<StaffNpc> staffList, bool deskQueue = false, bool phoneQueue = false)
         {
-            const float interactRange = 88f;
-
-            var radio = layout.LobbyRadio;
-            if (radio != null && Geometry.Dist(X, Y, radio.X, radio.Y) < 44)
-            {
-                return new InteractTarget { Kind = "radio" };
-            }
+            _ = deskQueue;
+            if (NearRadio(layout)) return new InteractTarget { Kind = "radio" };
+            if (NearPhone(layout)) return new InteractTarget { Kind = "phone" };
+            if (NearDeskPc(layout)) return new InteractTarget { Kind = "deskpc" };
 
             var phone = layout.DeskPhone;
-            if (phone != null && Geometry.Dist(X, Y, phone.X, phone.Y) < 42)
+            if (phoneQueue && NearDesk(layout, staffList) && phone != null)
             {
                 return new InteractTarget { Kind = "phone" };
             }
 
-            var deskPc = layout.DeskPc;
-            if (deskPc != null && Geometry.Dist(X, Y, deskPc.X, deskPc.Y) < 42)
-            {
-                return new InteractTarget { Kind = "deskpc" };
-            }
+            if (NearNewspaper(layout)) return new InteractTarget { Kind = "newspaper" };
+            if (NearDesk(layout, staffList)) return new InteractTarget { Kind = "desk" };
 
-            var desk = layout.FrontDesk;
-            float deskDist = Geometry.Dist(X, Y, desk.X, desk.Y);
-            bool deskBusy = false;
-            foreach (var staff in staffList)
-            {
-                if (staff != null && (staff.Phase == "waiting_pay" || staff.Phase == "to_desk"))
-                {
-                    deskBusy = true;
-                    break;
-                }
-            }
-
-            float deskRange = deskBusy ? 90f : 70f;
-            if (phoneQueue && deskDist < deskRange && phone != null)
-            {
-                return new InteractTarget { Kind = "phone" };
-            }
-
-            var paper = layout.Newspaper;
-            if (paper != null && Geometry.Dist(X, Y, paper.X, paper.Y) < 46)
-            {
-                return new InteractTarget { Kind = "newspaper" };
-            }
-
-            if (deskDist < deskRange && (deskBusy || deskQueue))
-            {
-                return new InteractTarget { Kind = "desk" };
-            }
-
-            if (deskDist < deskRange) return new InteractTarget { Kind = "desk" };
-
-            foreach (var staff in staffList)
-            {
-                if (staff == null) continue;
-                if (staff.Phase != "waiting_pay" && staff.Phase != "to_desk") continue;
-                if (Geometry.Dist(X, Y, staff.X, staff.Y) < 56)
-                {
-                    return new InteractTarget { Kind = "desk" };
-                }
-            }
-
-            var office = layout.Office;
-            if (office != null)
-            {
-                bool inside = System.Math.Abs(X - office.X) < office.W / 2f - 4f &&
-                              System.Math.Abs(Y - office.Y) < office.H / 2f - 4f;
-                float doorDist = Geometry.Dist(X, Y, office.Door.X, office.Door.Y);
-                if (inside || doorDist < 40) return new InteractTarget { Kind = "office" };
-            }
-
-            var sign = layout.VacancySign;
-            if (sign != null && Geometry.Dist(X, Y, sign.X, sign.Y) < 72)
-            {
-                return new InteractTarget { Kind = "sign" };
-            }
+            if (NearOffice(layout)) return new InteractTarget { Kind = "office" };
+            if (NearSign(layout)) return new InteractTarget { Kind = "sign" };
 
             Room best = null;
             float bestDist = float.PositiveInfinity;
-            foreach (var room in rooms)
+            if (rooms != null)
             {
-                var center = layout.RoomCenters[room.Id - 1];
-                float dist = Geometry.Dist(X, Y, center.X, center.Y);
-                if (dist < interactRange && dist < bestDist)
+                foreach (var room in rooms)
                 {
-                    best = room;
-                    bestDist = dist;
+                    if (!NearRoom(room, layout)) continue;
+                    var center = layout.RoomCenters[room.Id - 1];
+                    float dist = Geometry.Dist(X, Y, center.X, center.Y);
+                    if (dist < bestDist)
+                    {
+                        best = room;
+                        bestDist = dist;
+                    }
                 }
             }
 
             return best != null ? new InteractTarget { Kind = "room", Room = best } : null;
+        }
+
+        bool NearRadio(HotelLayout layout)
+        {
+            var radio = layout.LobbyRadio;
+            return radio != null && Geometry.Dist(X, Y, radio.X, radio.Y) < 44;
+        }
+
+        bool NearPhone(HotelLayout layout)
+        {
+            var phone = layout.DeskPhone;
+            return phone != null && Geometry.Dist(X, Y, phone.X, phone.Y) < 42;
+        }
+
+        bool NearDeskPc(HotelLayout layout)
+        {
+            var deskPc = layout.DeskPc;
+            return deskPc != null && Geometry.Dist(X, Y, deskPc.X, deskPc.Y) < 42;
+        }
+
+        bool NearNewspaper(HotelLayout layout)
+        {
+            var paper = layout.Newspaper;
+            return paper != null && Geometry.Dist(X, Y, paper.X, paper.Y) < 46;
+        }
+
+        bool NearDesk(HotelLayout layout, List<StaffNpc> staffList)
+        {
+            var desk = layout.FrontDesk;
+            float deskDist = Geometry.Dist(X, Y, desk.X, desk.Y);
+            bool deskBusy = false;
+            if (staffList != null)
+            {
+                foreach (var staff in staffList)
+                {
+                    if (staff != null && (staff.Phase == "waiting_pay" || staff.Phase == "to_desk"))
+                    {
+                        deskBusy = true;
+                        break;
+                    }
+                }
+            }
+
+            float deskRange = deskBusy ? 90f : 70f;
+            if (deskDist < deskRange) return true;
+
+            if (staffList == null) return false;
+            foreach (var staff in staffList)
+            {
+                if (staff == null) continue;
+                if (staff.Phase != "waiting_pay" && staff.Phase != "to_desk") continue;
+                if (Geometry.Dist(X, Y, staff.X, staff.Y) < 56) return true;
+            }
+
+            return false;
+        }
+
+        bool NearOffice(HotelLayout layout)
+        {
+            var office = layout.Office;
+            if (office == null) return false;
+            bool inside = System.Math.Abs(X - office.X) < office.W / 2f - 4f &&
+                          System.Math.Abs(Y - office.Y) < office.H / 2f - 4f;
+            float doorDist = Geometry.Dist(X, Y, office.Door.X, office.Door.Y);
+            return inside || doorDist < 40;
+        }
+
+        bool NearSign(HotelLayout layout)
+        {
+            var sign = layout.VacancySign;
+            return sign != null && Geometry.Dist(X, Y, sign.X, sign.Y) < 72;
+        }
+
+        bool NearRoom(Room room, HotelLayout layout)
+        {
+            if (room == null || layout?.RoomCenters == null) return false;
+            if (room.Id < 1 || room.Id > layout.RoomCenters.Count) return false;
+            var center = layout.RoomCenters[room.Id - 1];
+            return Geometry.Dist(X, Y, center.X, center.Y) < 88f;
         }
     }
 }
