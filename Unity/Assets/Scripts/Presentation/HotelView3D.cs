@@ -573,32 +573,43 @@ namespace Vacancy
             if (layout.Office != null)
             {
                 var office = layout.Office.Rect;
-                float pcX = office.X + office.W * 0.72f;
+                const float deskW = 56f;
+                const float deskD = 36f;
+                const float pcYaw = 90f;
+                float wall = layout.Tile;
+                float pcX = office.X + office.W - wall - deskD * 0.5f;
                 float pcY = office.Center.Y;
-                MarkInteract(
-                    Box(
-                        "PcDesk",
-                        new Rect(pcX - 28, pcY - 18, 56, 36),
-                        0.45f,
-                        0.9f,
-                        Palette.Hex("#2a3142")),
-                    "office");
-                MarkInteract(
-                    Box(
-                        "Pc",
-                        new Rect(pcX - 16, pcY - 8, 32, 16),
-                        1.05f,
-                        0.35f,
-                        Palette.Hex("#1a2030")),
-                    "office");
-                MarkInteract(
-                    Box(
-                        "PcScreen",
-                        new Rect(pcX - 12, pcY - 5, 24, 6),
-                        1.28f,
-                        0.22f,
-                        Palette.Hex("#7dffb2")),
-                    "office");
+
+                var pcRoot = new GameObject("OfficePc").transform;
+                pcRoot.SetParent(root, false);
+                pcRoot.position = WorldScale.ToWorld(pcX, pcY, 0f);
+
+                var desk = Box(
+                    "PcDesk",
+                    new Rect(pcX - deskW * 0.5f, pcY - deskD * 0.5f, deskW, deskD),
+                    0.45f,
+                    0.9f,
+                    Palette.Hex("#2a3142"));
+                var tower = Box(
+                    "Pc",
+                    new Rect(pcX - 16f, pcY - 8f, 32f, 16f),
+                    1.05f,
+                    0.35f,
+                    Palette.Hex("#1a2030"));
+                var screen = Box(
+                    "PcScreen",
+                    new Rect(pcX - 12f, pcY - 5f, 24f, 6f),
+                    1.28f,
+                    0.22f,
+                    Palette.Hex("#7dffb2"));
+                desk.transform.SetParent(pcRoot, true);
+                tower.transform.SetParent(pcRoot, true);
+                screen.transform.SetParent(pcRoot, true);
+                pcRoot.rotation = Quaternion.Euler(0f, pcYaw, 0f);
+
+                MarkInteract(desk, "office");
+                MarkInteract(tower, "office");
+                MarkInteract(screen, "office");
             }
 
             var sign = layout.VacancySign;
