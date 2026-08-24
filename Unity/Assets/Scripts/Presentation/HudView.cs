@@ -122,7 +122,8 @@ namespace Vacancy
                 new Vector2(168, -140),
                 new Vector2(312, 40),
                 new Vector2(312, 220),
-                "Today's tasks");
+                "Today's tasks",
+                new Vector2(0.5f, 0.5f));
             taskLines = MakeText(taskFold.Body, "Tasks", Vector2.zero, 13, Palette.Text, 276);
             taskLines.alignment = TextAnchor.UpperLeft;
             taskLines.rectTransform.sizeDelta = new Vector2(276, 150);
@@ -135,7 +136,8 @@ namespace Vacancy
                 new Vector2(-148, -140),
                 new Vector2(268, 40),
                 new Vector2(268, 220),
-                "Front desk");
+                "Front desk",
+                new Vector2(0.5f, 0.5f));
             vacancyBtn = ButtonOn(shopFold.Body, "Set: NO VACANCY", new Vector2(0, 48), () => game.ToggleVacancy());
             unlock = ButtonOn(shopFold.Body, "Unlock room", new Vector2(0, 0), () => game.UnlockNextRoom());
             MakeText(shopFold.Body, "Inspect → Clean → Repair", new Vector2(0, -56), 13, Palette.Muted, 240);
@@ -144,10 +146,11 @@ namespace Vacancy
                 "Log",
                 canvasGo.transform,
                 new Vector2(0f, 0f),
-                new Vector2(220, 28),
+                new Vector2(16, 16),
                 new Vector2(420, 40),
                 new Vector2(540, 280),
-                "Activity log");
+                "Activity log",
+                new Vector2(0f, 0f));
             logBox = MakeScrollBox(logFold.Body, Vector2.zero, new Vector2(508, 216));
             Stretch(logBox.Root.GetComponent<RectTransform>(), 0, 0, 0, 0);
 
@@ -871,9 +874,13 @@ namespace Vacancy
             Vector2 pos,
             Vector2 closedSize,
             Vector2 openSize,
-            string title)
+            string title,
+            Vector2 pivot)
         {
             var root = Panel(name, parent, anchor, pos, closedSize);
+            var rootRt = root.GetComponent<RectTransform>();
+            rootRt.pivot = pivot;
+            rootRt.anchoredPosition = pos;
             root.AddComponent<RectMask2D>();
             var header = ButtonOn(root.transform, title + "  ▼", Vector2.zero, () => { }, closedSize.x - 12f, 32f);
             var headerRt = header.GetComponent<RectTransform>();
