@@ -1294,10 +1294,28 @@ namespace Vacancy
             knobGo.transform.localScale = new Vector3(thickM + WorldScale.Meters(4f), 0.08f, WorldScale.Meters(4f));
             SetTrigger(knobGo);
 
-            var marker = pivot.gameObject.AddComponent<InteractHover>();
-            marker.Kind = "room";
-            marker.RoomId = planned.Id;
-            marker.Anchor = WorldScale.ToWorld(door.Center.X, door.Center.Y, 1.55f);
+            var doorAnchor = WorldScale.ToWorld(door.Center.X, door.Center.Y, 1.55f);
+            var leafRenderer = leafGo.GetComponent<Renderer>();
+            MarkInteract(leafRenderer, "room", planned.Id, doorAnchor);
+            MarkInteract(knobGo.GetComponent<Renderer>(), "room", planned.Id, doorAnchor);
+
+            var sensor = new GameObject($"RoomDoor-{planned.Id}-hover");
+            sensor.transform.SetParent(root, false);
+            sensor.transform.position = WorldScale.ToWorld(door.Center.X, door.Center.Y, 1.15f);
+            sensor.transform.localScale = east
+                ? WorldScale.Size(8f, 2.2f, leaf)
+                : WorldScale.Size(leaf, 2.2f, 8f);
+            var sensorCol = sensor.AddComponent<BoxCollider>();
+            sensorCol.isTrigger = true;
+            var sensorHover = sensor.AddComponent<InteractHover>();
+            sensorHover.Kind = "room";
+            sensorHover.RoomId = planned.Id;
+            sensorHover.Anchor = doorAnchor;
+
+            var pivotHover = pivot.gameObject.AddComponent<InteractHover>();
+            pivotHover.Kind = "room";
+            pivotHover.RoomId = planned.Id;
+            pivotHover.Anchor = doorAnchor;
 
             roomDoors.Add(new SwingingRoomDoor
             {
