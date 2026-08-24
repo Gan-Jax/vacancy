@@ -584,7 +584,7 @@ namespace Vacancy
                 pcRoot.SetParent(root, false);
                 pcRoot.position = WorldScale.ToWorld(pcX, pcY, 0f);
 
-                var desk = Box(
+                var pcDesk = Box(
                     "PcDesk",
                     new Rect(pcX - deskW * 0.5f, pcY - deskD * 0.5f, deskW, deskD),
                     0.45f,
@@ -602,12 +602,12 @@ namespace Vacancy
                     1.28f,
                     0.22f,
                     Palette.Hex("#7dffb2"));
-                desk.transform.SetParent(pcRoot, true);
+                pcDesk.transform.SetParent(pcRoot, true);
                 tower.transform.SetParent(pcRoot, true);
                 screen.transform.SetParent(pcRoot, true);
                 pcRoot.rotation = Quaternion.Euler(0f, pcYaw, 0f);
 
-                MarkInteract(desk, "office");
+                MarkInteract(pcDesk, "office");
                 MarkInteract(tower, "office");
                 MarkInteract(screen, "office");
             }
