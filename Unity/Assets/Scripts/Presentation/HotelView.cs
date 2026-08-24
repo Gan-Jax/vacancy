@@ -322,7 +322,7 @@ namespace Vacancy
             }
 
             if (state.WaitingGuests.Count > 0) return "Press E on the phone to check them in";
-            return "E phone / desk PC · E radio / paper · E office PC · V sign · Esc pause";
+            return "E phone / desk PC · E radio / paper · E office PC (supplies / hire) · V sign · Esc pause";
         }
 
         static Sprite MakeSquare()

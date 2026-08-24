@@ -361,11 +361,13 @@ namespace Vacancy
             Stage.Mark(state, "officePc");
             state.PcOpen = true;
             state.Paused = true;
+            hud.ResetOfficePc();
         }
 
         public void ClosePc()
         {
             state.PcOpen = false;
+            hud.ResetOfficePc();
             if (!state.PauseMenuOpen && state.DeskGuest == null && string.IsNullOrEmpty(state.MediaOpen)) state.Paused = false;
         }
 

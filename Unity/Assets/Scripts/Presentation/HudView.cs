@@ -29,12 +29,16 @@ namespace Vacancy
         readonly Button unlock;
         readonly Button vacancyBtn;
         readonly GameObject pcPanel;
+        readonly GameObject pcMenuPage;
+        readonly GameObject pcSuppliesPage;
+        readonly GameObject pcHirePage;
         readonly Text pcStock;
         readonly Text pcPending;
         readonly Text pcTotal;
         readonly Transform pcRows;
         readonly Dictionary<string, InputField> orderFields = new Dictionary<string, InputField>();
         bool pcShelterRows;
+        string officePage = "menu";
 
         readonly GameObject deskPanel;
         readonly Text deskName;
@@ -130,13 +134,11 @@ namespace Vacancy
                 new Vector2(1f, 1f),
                 new Vector2(-148, -140),
                 new Vector2(268, 40),
-                new Vector2(268, 340),
+                new Vector2(268, 220),
                 "Front desk");
-            vacancyBtn = ButtonOn(shopFold.Body, "Set: NO VACANCY", new Vector2(0, 112), () => game.ToggleVacancy());
-            hireBob = ButtonOn(shopFold.Body, $"Hire Bob — ${GameConfig.HireBobCost}", new Vector2(0, 60), () => game.HireBob());
-            hireMary = ButtonOn(shopFold.Body, $"Hire Mary — ${GameConfig.HireMaryCost}", new Vector2(0, 8), () => game.HireMary());
-            unlock = ButtonOn(shopFold.Body, "Unlock room", new Vector2(0, -44), () => game.UnlockNextRoom());
-            MakeText(shopFold.Body, "Inspect → Clean → Repair", new Vector2(0, -100), 13, Palette.Muted, 240);
+            vacancyBtn = ButtonOn(shopFold.Body, "Set: NO VACANCY", new Vector2(0, 48), () => game.ToggleVacancy());
+            unlock = ButtonOn(shopFold.Body, "Unlock room", new Vector2(0, 0), () => game.UnlockNextRoom());
+            MakeText(shopFold.Body, "Inspect → Clean → Repair", new Vector2(0, -56), 13, Palette.Muted, 240);
 
             logFold = MakeFoldout(
                 "Log",
@@ -150,16 +152,50 @@ namespace Vacancy
             Stretch(logBox.Root.GetComponent<RectTransform>(), 0, 0, 0, 0);
 
             pcPanel = Panel("OfficePc", canvasGo.transform, new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(580, 560));
-            MakeText(pcPanel.transform, "Office PC — Supply Orders", new Vector2(0, 250), 20, Palette.Accent, 520);
-            pcStock = MakeText(pcPanel.transform, "", new Vector2(0, 210), 13, Palette.Text, 520);
+            pcMenuPage = PageOn(pcPanel.transform, "Menu");
+            MakeText(pcMenuPage.transform, "Office PC", new Vector2(0, 200), 22, Palette.Accent, 520);
+            MakeText(pcMenuPage.transform, "Two things this computer does.", new Vector2(0, 150), 14, Palette.Muted, 520);
+            ButtonOn(pcMenuPage.transform, "1. Order supplies", new Vector2(0, 40), () => ShowOfficePage("supplies"), 280, 44);
+            ButtonOn(pcMenuPage.transform, "2. Hire help", new Vector2(0, -24), () => ShowOfficePage("hire"), 280, 44);
+            ButtonOn(pcMenuPage.transform, "Close", new Vector2(0, -220), () => game.ClosePc(), 140, 32);
+
+            pcSuppliesPage = PageOn(pcPanel.transform, "Supplies");
+            MakeText(pcSuppliesPage.transform, "Order supplies", new Vector2(0, 250), 20, Palette.Accent, 520);
+            pcStock = MakeText(pcSuppliesPage.transform, "", new Vector2(0, 210), 13, Palette.Text, 520);
             pcRows = new GameObject("OrderRows", typeof(RectTransform)).transform;
-            pcRows.SetParent(pcPanel.transform, false);
+            pcRows.SetParent(pcSuppliesPage.transform, false);
             BuildPcRows();
-            pcPending = MakeText(pcPanel.transform, "No deliveries in transit.", new Vector2(0, -170), 13, Palette.Muted, 520);
-            pcTotal = MakeText(pcPanel.transform, "Total: $0", new Vector2(-120, -210), 16, Palette.Accent, 200);
-            ButtonOn(pcPanel.transform, "Place order", new Vector2(80, -210), () => game.PlacePcOrder(ReadOrderQuantities()), 140, 32);
-            ButtonOn(pcPanel.transform, "Close", new Vector2(0, -250), () => game.ClosePc(), 140, 32);
+            pcPending = MakeText(pcSuppliesPage.transform, "No deliveries in transit.", new Vector2(0, -170), 13, Palette.Muted, 520);
+            pcTotal = MakeText(pcSuppliesPage.transform, "Total: $0", new Vector2(-120, -210), 16, Palette.Accent, 200);
+            ButtonOn(pcSuppliesPage.transform, "Place order", new Vector2(80, -210), () => game.PlacePcOrder(ReadOrderQuantities()), 140, 32);
+            ButtonOn(pcSuppliesPage.transform, "Back", new Vector2(0, -250), () => ShowOfficePage("menu"), 140, 32);
+
+            pcHirePage = PageOn(pcPanel.transform, "Hire");
+            MakeText(pcHirePage.transform, "Hire help", new Vector2(0, 200), 20, Palette.Accent, 520);
+            MakeText(
+                pcHirePage.transform,
+                "Bob repairs rooms. Mary inspects and cleans. They come out of the till.",
+                new Vector2(0, 140),
+                14,
+                Palette.Muted,
+                500);
+            hireBob = ButtonOn(
+                pcHirePage.transform,
+                $"Hire Bob — ${GameConfig.HireBobCost}",
+                new Vector2(0, 40),
+                () => game.HireBob(),
+                280,
+                44);
+            hireMary = ButtonOn(
+                pcHirePage.transform,
+                $"Hire Mary — ${GameConfig.HireMaryCost}",
+                new Vector2(0, -24),
+                () => game.HireMary(),
+                280,
+                44);
+            ButtonOn(pcHirePage.transform, "Back", new Vector2(0, -220), () => ShowOfficePage("menu"), 140, 32);
             pcPanel.SetActive(false);
+            ShowOfficePage("menu");
 
             deskPanel = Panel("DeskReview", canvasGo.transform, new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(640, 640));
             deskPanel.AddComponent<RectMask2D>();
@@ -382,7 +418,7 @@ namespace Vacancy
                 BuildPcRows();
             }
 
-            if (state.PcOpen) RefreshPc();
+            if (state.PcOpen && officePage == "supplies") RefreshPc();
             pcPanel.SetActive(state.PcOpen);
 
             if (state.DeskGuest != null) RefreshDesk();
@@ -589,7 +625,7 @@ namespace Vacancy
 
             if (staying == 0) lines.Add("No guests staying.");
             lines.Add("");
-            lines.Add("Supplies still go through the office PC.");
+            lines.Add("Supplies and hiring still go through the office PC.");
             deskPcLog.text = string.Join("\n", lines);
         }
 
@@ -805,6 +841,27 @@ namespace Vacancy
             rt.sizeDelta = size;
             go.GetComponent<Image>().color = new Color(Palette.HudPanel.r, Palette.HudPanel.g, Palette.HudPanel.b, 0.94f);
             return go;
+        }
+
+        static GameObject PageOn(Transform parent, string name)
+        {
+            var go = new GameObject(name, typeof(RectTransform));
+            go.transform.SetParent(parent, false);
+            Stretch(go.GetComponent<RectTransform>(), 0, 0, 0, 0);
+            return go;
+        }
+
+        public void ResetOfficePc()
+        {
+            ShowOfficePage("menu");
+        }
+
+        void ShowOfficePage(string page)
+        {
+            officePage = page;
+            if (pcMenuPage != null) pcMenuPage.SetActive(page == "menu");
+            if (pcSuppliesPage != null) pcSuppliesPage.SetActive(page == "supplies");
+            if (pcHirePage != null) pcHirePage.SetActive(page == "hire");
         }
 
         Foldout MakeFoldout(

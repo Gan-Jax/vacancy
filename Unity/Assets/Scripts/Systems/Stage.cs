@@ -25,7 +25,7 @@ namespace Vacancy
             ("checkIn", "Check in a guest"),
             ("vacancySign", "Flip the vacancy sign"),
             ("roomWork", "Inspect or clean a room"),
-            ("hireStaff", "Hire Bob or Mary"),
+            ("hireStaff", "Hire Bob or Mary from the office PC"),
             ("officePc", "Open the office PC")
         };
 
