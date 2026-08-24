@@ -327,7 +327,6 @@ namespace Vacancy
                         backBlock.Y,
                         officeW - stairW,
                         officeH);
-                    var stairsSouth = MakeDoor(stairsRect, "south", spec.DoorWidth, 0.82f, tile);
                     var stairsEast = MakeDoor(stairsRect, "east", spec.DoorWidth, 0.5f, tile);
                     floor.Areas.Add(new FloorArea
                     {
@@ -336,10 +335,24 @@ namespace Vacancy
                         Label = "Basement stairs",
                         Rect = stairsRect,
                         Walls = true,
-                        Doors = new List<Door> { stairsSouth, stairsEast }
+                        Doors = new List<Door> { stairsEast }
                     });
                     floor.Stairs = stairsRect;
-                    var officeDoor = MakeDoor(officeRect, "south", spec.DoorWidth, 0.55f, tile);
+                    float deskH = Down(40);
+                    float staffAlley = Down(60);
+                    floor.FrontDesk = new DeskSpot
+                    {
+                        X = backBlock.X + backBlock.W / 2f,
+                        Y = backBlock.Y + backBlock.H + staffAlley + deskH / 2f,
+                        W = Down(160),
+                        H = deskH
+                    };
+
+                    float officeDoorAlong = Geometry.Clamp(
+                        (floor.FrontDesk.X - officeRect.X) / officeRect.W,
+                        0.2f,
+                        0.8f);
+                    var officeDoor = MakeDoor(officeRect, "south", spec.DoorWidth, officeDoorAlong, tile);
                     var officeWest = MakeDoor(officeRect, "west", spec.DoorWidth, 0.5f, tile);
                     floor.Areas.Add(new FloorArea
                     {
@@ -361,16 +374,6 @@ namespace Vacancy
                         Rect = officeRect,
                         Door = officeDoor.Center,
                         Approach = OutsidePoint(officeDoor, tile)
-                    };
-
-                    float deskH = Down(40);
-                    float staffAlley = Down(60);
-                    floor.FrontDesk = new DeskSpot
-                    {
-                        X = backBlock.X + backBlock.W / 2f,
-                        Y = backBlock.Y + backBlock.H + staffAlley + deskH / 2f,
-                        W = Down(160),
-                        H = deskH
                     };
 
                     PushSideCorridors(floor.Areas, content, bandRect, roomsBlockX, roomsBlockW);

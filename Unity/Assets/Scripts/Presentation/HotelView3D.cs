@@ -148,10 +148,8 @@ namespace Vacancy
             // filled the stair well with a solid slab, so the steps vanished.
             SlabWithHole("Lot", lotRect, layout.Building, 0.02f, 0.04f, Palette.FloorColor(8), false);
             var well = Pad(layout.Stairs, 4f);
-            var officeAndStairs = Union(layout.Office?.Rect ?? default, layout.Stairs);
-            if (officeAndStairs.W > 0f) well = Union(well, officeAndStairs);
             SlabWithHole("BuildingFloor", layout.Building, well, 0.03f, 0.06f, Palette.Corridor);
-            SlabWithHole("Ceiling", layout.Building, Pad(layout.Stairs, 4f), WorldScale.CeilingY, 0.08f, Palette.Hex("#1a2030"));
+            SlabWithHole("Ceiling", layout.Building, well, WorldScale.CeilingY, 0.08f, Palette.Hex("#1a2030"));
             if (layout.Basement.W > 0)
             {
                 SlabWithHole(
@@ -178,7 +176,7 @@ namespace Vacancy
                     SlabWithHole(
                         area.Id + "-floor",
                         Inset(area.Rect, layout.Tile),
-                        Union(layout.Office?.Rect ?? default, Pad(layout.Stairs, 2f)),
+                        Pad(layout.Stairs, 2f),
                         0.05f,
                         0.08f,
                         Palette.LobbyFloor);
@@ -186,8 +184,9 @@ namespace Vacancy
                 }
                 else if (area.Kind == AreaKind.Office)
                 {
-                    Box(area.Id + "-floor", Inset(area.Rect, layout.Tile), 0.08f, 0.06f, Palette.OfficeFloor);
+                    Box(area.Id + "-floor", Inset(area.Rect, layout.Tile), 0.11f, 0.06f, Palette.OfficeFloor);
                     Walls(area.Id, area.Rect, area.Doors, Palette.OfficeWall);
+                    HangOfficeDoor(area);
                 }
                 else if (area.Kind == AreaKind.Stairs)
                 {
@@ -675,6 +674,7 @@ namespace Vacancy
                 float gap0 = along - door.Width / 2f;
                 float gap1 = gap0 + door.Width;
                 if (gap0 > cursor + 2f) WallSpan(name + i + "a", side, rect, cursor, gap0, color, yBottom);
+                FrameOpening(name + i + "door", door, side, rect, color, yBottom);
                 if (gap1 > cursor) cursor = gap1;
             }
 
@@ -693,6 +693,57 @@ namespace Vacancy
             else wallRect = new Rect(rect.X + rect.W - thick, from, thick, len);
 
             Box(name, wallRect, yBottom + WorldScale.WallHeight * 0.5f, WorldScale.WallHeight, color);
+        }
+
+        void FrameOpening(string name, Door door, string side, Rect rect, Color color, float yBottom)
+        {
+            float thick = layout.Tile;
+            bool horiz = side == "north" || side == "south";
+            float along = horiz ? door.Center.X : door.Center.Y;
+            float gap0 = along - door.Width / 2f;
+            Rect opening;
+            if (side == "north") opening = new Rect(gap0, rect.Y, door.Width, thick);
+            else if (side == "south") opening = new Rect(gap0, rect.Y + rect.H - thick, door.Width, thick);
+            else if (side == "west") opening = new Rect(rect.X, gap0, thick, door.Width);
+            else opening = new Rect(rect.X + rect.W - thick, gap0, thick, door.Width);
+
+            float lintelH = 0.55f;
+            Box(
+                name + "-lintel",
+                opening,
+                yBottom + WorldScale.WallHeight - lintelH * 0.5f,
+                lintelH,
+                color);
+            Box(name + "-sill", opening, yBottom + 0.055f, 0.05f, Palette.Doorway);
+        }
+
+        void HangOfficeDoor(FloorArea office)
+        {
+            if (office?.Doors == null) return;
+            Door south = null;
+            foreach (var door in office.Doors)
+            {
+                if (door != null && door.Side == "south") south = door;
+            }
+
+            if (south == null) return;
+
+            float thick = 5f;
+            float leaf = south.Width * 0.9f;
+            float hingeX = south.Center.X - south.Width / 2f + 2f;
+            float y0 = south.Center.Y - leaf;
+            Box(
+                "OfficeDoor",
+                new Rect(hingeX, y0, thick, leaf),
+                1.15f,
+                2.2f,
+                Palette.Hex("#5a4030"));
+            Box(
+                "OfficeDoorKnob",
+                new Rect(hingeX + thick, y0 + leaf * 0.45f, 3f, 4f),
+                1.05f,
+                0.08f,
+                Palette.Hex("#c4a574"));
         }
 
         void BuildParkingLot(Rect lot)
@@ -865,7 +916,7 @@ namespace Vacancy
             }
 
             if (state.WaitingGuests.Count > 0) return "Press E on the phone to check them in";
-            return "Hold RMB to look · WASD walk · E interact · X pin · Esc pause · office-left stairs to basement";
+            return "Hold RMB to look · WASD walk · E interact · X pin · Esc pause · office door behind the desk to the basement";
         }
 
         static Mesh BuildCube()

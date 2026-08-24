@@ -301,7 +301,7 @@ namespace Vacancy
             var problems = Navigation.ValidateFloor(NavGrid, Floor, DeskApproach());
             if (BasementGrid == null || Stairs.W <= 0) return problems;
 
-            var permits = new HashSet<string>();
+            var permits = new HashSet<string> { "office" };
             if (Navigation.FindRoute(NavGrid, DeskApproach(), StairsTop, permits, 12f) == null)
             {
                 problems.Add("Basement stairs are unreachable from the lobby");

@@ -35,7 +35,7 @@ namespace Vacancy
 
         public static HashSet<string> BuildPermits(List<Room> rooms, object allowRoomId)
         {
-            var permits = new HashSet<string>();
+            var permits = new HashSet<string> { "office" };
             if (allowRoomId is string s && s == "player")
             {
                 permits.Add("office");
