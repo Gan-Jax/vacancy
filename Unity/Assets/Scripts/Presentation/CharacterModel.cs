@@ -121,19 +121,7 @@ namespace Vacancy
             if (driver == null) driver = instance.AddComponent<HumanMotionDriver>();
             driver.Bind(animator, idle, walk);
 
-            var renderers = instance.GetComponentsInChildren<Renderer>(true);
-            var clothes = new Renderer[renderers.Length];
-            int count = 0;
-            for (int i = 0; i < renderers.Length; i++)
-            {
-                if (renderers[i] is ParticleSystemRenderer) continue;
-                clothes[count++] = renderers[i];
-            }
-
-            if (count != clothes.Length)
-            {
-                Array.Resize(ref clothes, count);
-            }
+            var clothes = instance.GetComponentsInChildren<Renderer>(true);
 
             var clothingMats = InstanceMaterials(clothes);
             if (firstPerson) HideFirstPersonHead(instance.transform);
