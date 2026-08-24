@@ -32,6 +32,8 @@ namespace Vacancy
         public bool WorkedToday;
         public bool PaydayDue;
         public float StallSeconds { get; set; }
+        public int FloorLevel { get; set; }
+        public float FootY { get; set; }
 
         public StaffNpc(StaffProfile profile, Point home)
         {
@@ -46,7 +48,10 @@ namespace Vacancy
 
         public static StaffNpc SpawnAtHome(HotelLayout layout, StaffProfile profile)
         {
-            return new StaffNpc(profile, layout.StaffHome(profile.Department ?? profile.Id));
+            var staff = new StaffNpc(profile, layout.StaffHome(profile.Department ?? profile.Id));
+            staff.FloorLevel = -1;
+            staff.FootY = -WorldScale.FloorDepth;
+            return staff;
         }
 
         public Point HomePoint(HotelLayout layout)
@@ -54,9 +59,19 @@ namespace Vacancy
             return layout.StaffHome(Department ?? Id);
         }
 
+        PathOptions HomePathOptions()
+        {
+            return new PathOptions { Radius = Radius, FromFloor = FloorLevel, ToFloor = -1 };
+        }
+
+        PathOptions GroundPathOptions()
+        {
+            return new PathOptions { Radius = Radius, FromFloor = FloorLevel, ToFloor = 0 };
+        }
+
         public List<Point> PathHome(HotelLayout layout)
         {
-            return Pathing.FindPath(layout, X, Y, HomePoint(layout), new PathOptions { Radius = Radius });
+            return Pathing.FindPath(layout, X, Y, HomePoint(layout), HomePathOptions());
         }
 
         public Point PaySlot(HotelLayout layout)
@@ -100,7 +115,7 @@ namespace Vacancy
         public void BeginPaydayTrip(HotelLayout layout)
         {
             TargetRoom = null;
-            Path = Pathing.PathToDeskHall(layout, X, Y, new PathOptions { Radius = Radius });
+            Path = Pathing.PathToDeskHall(layout, X, Y, GroundPathOptions());
             Phase = "to_desk";
         }
 
@@ -141,6 +156,8 @@ namespace Vacancy
                 var slot = PaySlot(layout);
                 X = slot.X;
                 Y = slot.Y;
+                FloorLevel = 0;
+                FootY = 0f;
                 return;
             }
 
@@ -148,7 +165,7 @@ namespace Vacancy
             {
                 if (Path.Count == 0)
                 {
-                    Path = Pathing.PathToDeskHall(layout, X, Y, new PathOptions { Radius = Radius });
+                    Path = Pathing.PathToDeskHall(layout, X, Y, GroundPathOptions());
                 }
 
                 bool atHall = Pathing.FollowPath(this, dt, state.Rooms, layout, null, speed);
@@ -202,7 +219,7 @@ namespace Vacancy
                 if (TargetRoom != null)
                 {
                     Phase = "to_door";
-                    Path = Pathing.FindPath(layout, X, Y, layout.RoomDoor(TargetRoom.Id), new PathOptions { Radius = Radius });
+                    Path = Pathing.FindPath(layout, X, Y, layout.RoomDoor(TargetRoom.Id), GroundPathOptions());
                 }
                 else if (Phase != "idle" && Phase != "to_closet")
                 {
@@ -239,7 +256,7 @@ namespace Vacancy
             {
                 if (Path.Count == 0)
                 {
-                    Path = Pathing.FindPath(layout, X, Y, layout.RoomDoor(TargetRoom.Id), new PathOptions { Radius = Radius });
+                    Path = Pathing.FindPath(layout, X, Y, layout.RoomDoor(TargetRoom.Id), GroundPathOptions());
                 }
 
                 if (Pathing.FollowPath(this, dt, state.Rooms, layout, null, speed))
@@ -323,6 +340,8 @@ namespace Vacancy
         {
             X = slot.X;
             Y = slot.Y;
+            FloorLevel = 0;
+            FootY = 0f;
             Phase = "waiting_pay";
             Path.Clear();
             state.AddLog($"{Name} is at the desk for payday (${WagesOwed}). Press E.");

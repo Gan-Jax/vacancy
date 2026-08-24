@@ -15,6 +15,9 @@ namespace Vacancy
         readonly List<CharacterView> characters = new List<CharacterView>();
         CharacterModel playerBody;
         readonly Text hint;
+        readonly Text inspectBanner;
+        readonly Text pinReadout;
+        readonly Transform pinMarker;
         readonly Font font;
         readonly Mesh cubeMesh;
         readonly Mesh cylinderMesh;
@@ -37,6 +40,9 @@ namespace Vacancy
             playerBody = CharacterModel.BuildFirstPerson(root, playerCamera, Mat);
             playerBody.Recolor(Palette.Player);
             hint = BuildHint(parent);
+            inspectBanner = BuildInspectBanner(hint.transform.parent);
+            pinReadout = BuildPinReadout(hint.transform.parent);
+            pinMarker = BuildPinMarker();
         }
 
         public void SyncPlayer(PlayerActor player, float dt)
@@ -92,7 +98,7 @@ namespace Vacancy
 
                 float lookX = guest.Phase == "waiting_checkout" ? layout.FrontDesk.X : float.NaN;
                 float lookY = guest.Phase == "waiting_checkout" ? layout.FrontDesk.Y : float.NaN;
-                PlaceCharacter(used++, guest.X, guest.Y, color, label, lookX, lookY);
+                PlaceCharacter(used++, guest.X, guest.Y, color, label, lookX, lookY, guest.FootY);
             }
 
             foreach (var person in staff)
@@ -102,12 +108,37 @@ namespace Vacancy
                 if (person.Phase == "waiting_pay") label = $"{person.Name} pay ${person.WagesOwed}";
                 else if (person.Phase == "to_desk") label = $"{person.Name} ->pay";
                 else if (person.PaydayDue) label = $"{person.Name} payday";
-                PlaceCharacter(used++, person.X, person.Y, Palette.Hex(person.Color), label);
+                PlaceCharacter(used++, person.X, person.Y, Palette.Hex(person.Color), label, float.NaN, float.NaN, person.FootY);
             }
 
             for (int i = used; i < characters.Count; i++) characters[i].Model.GameObject.SetActive(false);
 
             if (hint != null) hint.text = HintText(state, staff);
+        }
+
+        public void SetInspect(bool enabled, string hoverLine, Vector3? worldPoint)
+        {
+            if (inspectBanner != null)
+            {
+                inspectBanner.gameObject.SetActive(enabled);
+                inspectBanner.text = enabled
+                    ? (string.IsNullOrEmpty(hoverLine)
+                        ? "INSPECT (X) — click a spot (cursor unlocked) to pin it"
+                        : hoverLine)
+                    : "";
+            }
+
+            if (pinReadout != null)
+            {
+                pinReadout.gameObject.SetActive(enabled && !string.IsNullOrEmpty(hoverLine));
+                pinReadout.text = hoverLine ?? "";
+            }
+
+            if (pinMarker != null)
+            {
+                pinMarker.gameObject.SetActive(enabled && worldPoint.HasValue);
+                if (worldPoint.HasValue) pinMarker.position = worldPoint.Value;
+            }
         }
 
         void BuildGround()
@@ -118,14 +149,25 @@ namespace Vacancy
                 0.02f,
                 0.04f,
                 Palette.FloorColor(8));
-            Box("BuildingFloor", layout.Building, 0.03f, 0.06f, Palette.Corridor);
-            Box("Ceiling", layout.Building, WorldScale.CeilingY, 0.08f, Palette.Hex("#1a2030"));
+            SlabWithHole("BuildingFloor", layout.Building, layout.Stairs, 0.03f, 0.06f, Palette.Corridor);
+            SlabWithHole("Ceiling", layout.Building, layout.Stairs, WorldScale.CeilingY, 0.08f, Palette.Hex("#1a2030"));
+            if (layout.Basement.W > 0)
+            {
+                SlabWithHole(
+                    "BasementCeiling",
+                    layout.Basement,
+                    layout.Stairs,
+                    WorldScale.BasementFloorY + WorldScale.WallHeight + 0.12f,
+                    0.06f,
+                    Palette.Hex("#1a2030"));
+            }
         }
 
         void BuildInteriors()
         {
             foreach (var area in layout.Floor.Areas)
             {
+                if (area.Level < 0) continue;
                 if (area.Kind == AreaKind.Corridor)
                 {
                     Box(area.Id, area.Rect, 0.05f, 0.08f, Palette.Corridor);
@@ -139,6 +181,10 @@ namespace Vacancy
                 {
                     Box(area.Id + "-floor", Inset(area.Rect, layout.Tile), 0.05f, 0.08f, Palette.OfficeFloor);
                     Walls(area.Id, area.Rect, area.Doors, Palette.OfficeWall);
+                }
+                else if (area.Kind == AreaKind.Stairs)
+                {
+                    BuildStairwell(area);
                 }
                 else if (area.Kind == AreaKind.Department)
                 {
@@ -163,6 +209,88 @@ namespace Vacancy
                     0.4f,
                     Palette.Hex("#3a455c"));
             }
+
+            BuildBasement();
+        }
+
+        void BuildBasement()
+        {
+            float floorY = WorldScale.BasementFloorY;
+            foreach (var area in layout.Floor.Areas)
+            {
+                if (area.Level >= 0) continue;
+                if (area.Kind == AreaKind.Basement)
+                {
+                    Box(area.Id + "-floor", Inset(area.Rect, layout.Tile), floorY + 0.05f, 0.08f, Palette.Hex("#3a342c"));
+                    Walls(area.Id, area.Rect, area.Doors, Palette.Hex("#2a2620"), floorY);
+                }
+                else if (area.Kind == AreaKind.Department)
+                {
+                    Box(area.Id + "-floor", Inset(area.Rect, layout.Tile), floorY + 0.05f, 0.08f, Palette.Hex("#4a3f52"));
+                    Walls(area.Id, area.Rect, area.Doors, Palette.Wall, floorY);
+                }
+                else if (area.Kind == AreaKind.Storage)
+                {
+                    Box(area.Id + "-floor", Inset(area.Rect, 4f), floorY + 0.06f, 0.04f, Palette.Hex("#4a4034"));
+                }
+            }
+
+            if (layout.Departments != null)
+            {
+                foreach (var dept in layout.Departments.Values)
+                {
+                    var r = dept.Rect;
+                    Box(
+                        dept.Id + "-bench",
+                        new Rect(r.X + 16f, r.Y + 16f, r.W * 0.45f, 28f),
+                        floorY + 0.45f,
+                        0.7f,
+                        Palette.Hex(dept.Accent ?? "#6a5a48"));
+                    Box(
+                        dept.Id + "-crate",
+                        new Rect(r.X + r.W * 0.55f, r.Y + r.H * 0.35f, 36f, 28f),
+                        floorY + 0.32f,
+                        0.5f,
+                        Palette.Hex("#5a4030"));
+                }
+            }
+
+            var store = layout.Basement.W > 0 ? layout.Basement : layout.Lobby;
+            Box("StoreShelfA", new Rect(store.X + 40f, store.Y + 40f, 90f, 22f), floorY + 0.55f, 1f, Palette.Hex("#4a3a28"));
+            Box("StoreShelfB", new Rect(store.X + store.W - 130f, store.Y + 40f, 90f, 22f), floorY + 0.55f, 1f, Palette.Hex("#4a3a28"));
+            Box("StoreCrateA", new Rect(store.Center.X - 70f, store.Center.Y - 20f, 36f, 28f), floorY + 0.28f, 0.46f, Palette.Hex("#6a5038"));
+            Box("StoreCrateB", new Rect(store.Center.X + 20f, store.Center.Y + 10f, 40f, 30f), floorY + 0.34f, 0.58f, Palette.Hex("#5a4030"));
+        }
+
+        void BuildStairwell(FloorArea area)
+        {
+            Walls(area.Id, area.Rect, area.Doors, Palette.OfficeWall);
+            int steps = 10;
+            float stepW = area.Rect.W / steps;
+            for (int i = 0; i < steps; i++)
+            {
+                float t = 1f - (i + 0.5f) / steps;
+                float y = -t * WorldScale.FloorDepth;
+                Box(
+                    $"Stair-{i}",
+                    new Rect(area.Rect.X + i * stepW, area.Rect.Y + 4f, stepW, area.Rect.H - 8f),
+                    y + 0.08f,
+                    0.16f,
+                    Palette.Hex(i % 2 == 0 ? "#5a5048" : "#4a443c"));
+            }
+
+            Box(
+                "StairRailN",
+                new Rect(area.Rect.X, area.Rect.Y, area.Rect.W, 6f),
+                WorldScale.WallHeight * 0.35f,
+                0.9f,
+                Palette.Hex("#2a2430"));
+            Box(
+                "StairRailS",
+                new Rect(area.Rect.X, area.Rect.Y + area.Rect.H - 6f, area.Rect.W, 6f),
+                WorldScale.WallHeight * 0.35f,
+                0.9f,
+                Palette.Hex("#2a2430"));
         }
 
         void BuildFurniture()
@@ -302,6 +430,30 @@ namespace Vacancy
                 PointLight("OfficeLight", layout.Office.X, layout.Office.Y, 2.1f, 8f, 1.05f, new Color(0.7f, 0.95f, 0.85f));
             }
 
+            if (layout.Stairs.W > 0)
+            {
+                PointLight(
+                    "StairLight",
+                    layout.Stairs.Center.X,
+                    layout.Stairs.Center.Y,
+                    1.4f,
+                    7f,
+                    0.9f,
+                    new Color(0.95f, 0.82f, 0.55f));
+            }
+
+            if (layout.Basement.W > 0)
+            {
+                PointLight(
+                    "BasementLight",
+                    layout.Basement.Center.X,
+                    layout.Basement.Center.Y,
+                    WorldScale.BasementFloorY + 2.2f,
+                    14f,
+                    1.15f,
+                    new Color(0.85f, 0.72f, 0.5f));
+            }
+
             if (layout.Parking.W > 0)
             {
                 PointLight(
@@ -366,7 +518,60 @@ namespace Vacancy
             return text;
         }
 
-        void PlaceCharacter(int index, float x, float y, Color color, string label, float lookX = float.NaN, float lookY = float.NaN)
+        Text BuildInspectBanner(Transform parent)
+        {
+            var go = new GameObject("InspectBanner", typeof(RectTransform), typeof(Text));
+            go.transform.SetParent(parent, false);
+            var rt = go.GetComponent<RectTransform>();
+            rt.anchorMin = new Vector2(0.5f, 1f);
+            rt.anchorMax = new Vector2(0.5f, 1f);
+            rt.pivot = new Vector2(0.5f, 1f);
+            rt.anchoredPosition = new Vector2(0, -18);
+            rt.sizeDelta = new Vector2(1400, 40);
+            var text = go.GetComponent<Text>();
+            text.font = font;
+            text.fontSize = 18;
+            text.alignment = TextAnchor.UpperCenter;
+            text.color = Palette.Accent;
+            text.text = "";
+            go.SetActive(false);
+            return text;
+        }
+
+        Text BuildPinReadout(Transform parent)
+        {
+            var go = new GameObject("PinReadout", typeof(RectTransform), typeof(Text));
+            go.transform.SetParent(parent, false);
+            var rt = go.GetComponent<RectTransform>();
+            rt.anchorMin = rt.anchorMax = new Vector2(0.5f, 0.5f);
+            rt.pivot = new Vector2(0.5f, 1f);
+            rt.anchoredPosition = new Vector2(0, -18);
+            rt.sizeDelta = new Vector2(1100, 48);
+            var text = go.GetComponent<Text>();
+            text.font = font;
+            text.fontSize = 16;
+            text.alignment = TextAnchor.UpperCenter;
+            text.color = Palette.Accent;
+            text.text = "";
+            go.SetActive(false);
+            return text;
+        }
+
+        Transform BuildPinMarker()
+        {
+            var go = MeshObject(
+                "PinMarker",
+                root,
+                cubeMesh,
+                Vector3.zero,
+                new Vector3(0.22f, 0.08f, 0.22f),
+                Palette.Accent,
+                false);
+            go.SetActive(false);
+            return go.transform;
+        }
+
+        void PlaceCharacter(int index, float x, float y, Color color, string label, float lookX = float.NaN, float lookY = float.NaN, float footY = 0f)
         {
             while (characters.Count <= index)
             {
@@ -408,7 +613,7 @@ namespace Vacancy
 
             view.LastX = x;
             view.LastY = y;
-            view.Model.Place(x, y, view.Yaw, Time.deltaTime);
+            view.Model.Place(x, y, view.Yaw, Time.deltaTime, footY);
 
             if (playerCamera != null)
             {
@@ -420,41 +625,56 @@ namespace Vacancy
             }
         }
 
-        void Walls(string name, Rect rect, List<Door> doors, Color color)
+        void Walls(string name, Rect rect, List<Door> doors, Color color, float yBottom = 0f)
         {
-            AddSide(name + "-N", "north", rect, doors, color);
-            AddSide(name + "-S", "south", rect, doors, color);
-            AddSide(name + "-W", "west", rect, doors, color);
-            AddSide(name + "-E", "east", rect, doors, color);
+            AddSide(name + "-N", "north", rect, doors, color, yBottom);
+            AddSide(name + "-S", "south", rect, doors, color, yBottom);
+            AddSide(name + "-W", "west", rect, doors, color, yBottom);
+            AddSide(name + "-E", "east", rect, doors, color, yBottom);
         }
 
-        void AddSide(string name, string side, Rect rect, List<Door> doors, Color color)
+        void AddSide(string name, string side, Rect rect, List<Door> doors, Color color, float yBottom)
         {
-            Door door = null;
+            var gaps = new List<Door>();
             if (doors != null)
             {
                 foreach (var candidate in doors)
                 {
-                    if (candidate != null && candidate.Side == side) door = candidate;
+                    if (candidate != null && candidate.Side == side) gaps.Add(candidate);
                 }
             }
 
             bool horiz = side == "north" || side == "south";
             float start = horiz ? rect.X : rect.Y;
             float end = horiz ? rect.X + rect.W : rect.Y + rect.H;
-            if (door == null)
+            if (gaps.Count == 0)
             {
-                WallSpan(name, side, rect, start, end, color);
+                WallSpan(name, side, rect, start, end, color, yBottom);
                 return;
             }
 
-            float gap0 = (horiz ? door.Center.X : door.Center.Y) - door.Width / 2f;
-            float gap1 = gap0 + door.Width;
-            if (gap0 > start + 2f) WallSpan(name + "a", side, rect, start, gap0, color);
-            if (gap1 < end - 2f) WallSpan(name + "b", side, rect, gap1, end, color);
+            gaps.Sort((a, b) =>
+            {
+                float ac = horiz ? a.Center.X : a.Center.Y;
+                float bc = horiz ? b.Center.X : b.Center.Y;
+                return ac.CompareTo(bc);
+            });
+
+            float cursor = start;
+            for (int i = 0; i < gaps.Count; i++)
+            {
+                var door = gaps[i];
+                float along = horiz ? door.Center.X : door.Center.Y;
+                float gap0 = along - door.Width / 2f;
+                float gap1 = gap0 + door.Width;
+                if (gap0 > cursor + 2f) WallSpan(name + i + "a", side, rect, cursor, gap0, color, yBottom);
+                if (gap1 > cursor) cursor = gap1;
+            }
+
+            if (cursor < end - 2f) WallSpan(name + "z", side, rect, cursor, end, color, yBottom);
         }
 
-        void WallSpan(string name, string side, Rect rect, float from, float to, Color color)
+        void WallSpan(string name, string side, Rect rect, float from, float to, Color color, float yBottom)
         {
             float len = to - from;
             if (len < 2f) return;
@@ -465,7 +685,7 @@ namespace Vacancy
             else if (side == "west") wallRect = new Rect(rect.X, from, thick, len);
             else wallRect = new Rect(rect.X + rect.W - thick, from, thick, len);
 
-            Box(name, wallRect, WorldScale.WallHeight * 0.5f, WorldScale.WallHeight, color);
+            Box(name, wallRect, yBottom + WorldScale.WallHeight * 0.5f, WorldScale.WallHeight, color);
         }
 
         void BuildParkingLot(Rect lot)
@@ -506,6 +726,41 @@ namespace Vacancy
 
         static string lotId(string name) => "Parking-" + name;
 
+        void SlabWithHole(string name, Rect outer, Rect hole, float yCenter, float height, Color color)
+        {
+            if (hole.W <= 0f || hole.H <= 0f ||
+                hole.X >= outer.X + outer.W || hole.X + hole.W <= outer.X ||
+                hole.Y >= outer.Y + outer.H || hole.Y + hole.H <= outer.Y)
+            {
+                Box(name, outer, yCenter, height, color);
+                return;
+            }
+
+            float holeX0 = Mathf.Max(outer.X, hole.X);
+            float holeX1 = Mathf.Min(outer.X + outer.W, hole.X + hole.W);
+            float holeY0 = Mathf.Max(outer.Y, hole.Y);
+            float holeY1 = Mathf.Min(outer.Y + outer.H, hole.Y + hole.H);
+            if (holeY0 > outer.Y + 2f)
+            {
+                Box(name + "-N", new Rect(outer.X, outer.Y, outer.W, holeY0 - outer.Y), yCenter, height, color);
+            }
+
+            if (holeY1 < outer.Y + outer.H - 2f)
+            {
+                Box(name + "-S", new Rect(outer.X, holeY1, outer.W, outer.Y + outer.H - holeY1), yCenter, height, color);
+            }
+
+            if (holeX0 > outer.X + 2f)
+            {
+                Box(name + "-W", new Rect(outer.X, holeY0, holeX0 - outer.X, holeY1 - holeY0), yCenter, height, color);
+            }
+
+            if (holeX1 < outer.X + outer.W - 2f)
+            {
+                Box(name + "-E", new Rect(holeX1, holeY0, outer.X + outer.W - holeX1, holeY1 - holeY0), yCenter, height, color);
+            }
+        }
+
         Renderer Box(string name, Rect rect, float yCenter, float height, Color color)
         {
             var go = MeshObject(
@@ -531,7 +786,7 @@ namespace Vacancy
             light.shadows = LightShadows.None;
         }
 
-        GameObject MeshObject(string name, Transform parent, Mesh mesh, Vector3 position, Vector3 scale, Color color)
+        GameObject MeshObject(string name, Transform parent, Mesh mesh, Vector3 position, Vector3 scale, Color color, bool collider = true)
         {
             var go = new GameObject(name);
             go.transform.SetParent(parent, false);
@@ -542,6 +797,7 @@ namespace Vacancy
             renderer.sharedMaterial = Mat(color);
             renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
             renderer.receiveShadows = false;
+            if (collider) go.AddComponent<BoxCollider>();
             return go;
         }
 
@@ -584,7 +840,7 @@ namespace Vacancy
             }
 
             if (state.WaitingGuests.Count > 0) return "Press E on the phone to check them in";
-            return "Hold RMB to look · WASD walk · E interact · Esc pause · walk out to the lot for the vacancy sign";
+            return "Hold RMB to look · WASD walk · E interact · X pin · Esc pause · office-left stairs to basement";
         }
 
         static Mesh BuildCube()

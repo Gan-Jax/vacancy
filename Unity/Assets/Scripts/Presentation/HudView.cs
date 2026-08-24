@@ -300,6 +300,23 @@ namespace Vacancy
             Refresh(true);
         }
 
+        public bool PointerOverHud()
+        {
+            var es = UnityEngine.EventSystems.EventSystem.current;
+            if (es == null) return false;
+            var data = new UnityEngine.EventSystems.PointerEventData(es) { position = Input.mousePosition };
+            var hits = new List<UnityEngine.EventSystems.RaycastResult>();
+            es.RaycastAll(data, hits);
+            foreach (var hit in hits)
+            {
+                if (hit.gameObject == null) continue;
+                var canvas = hit.gameObject.GetComponentInParent<Canvas>();
+                if (canvas != null && canvas.sortingOrder >= 50) return true;
+            }
+
+            return false;
+        }
+
         public void Refresh(bool force = false)
         {
             money.text = $"Cash ${state.Money}";

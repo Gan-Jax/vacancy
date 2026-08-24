@@ -214,9 +214,9 @@ namespace Vacancy
             }
         }
 
-        public void Place(float layoutX, float layoutY, float yawDegrees, float dt)
+        public void Place(float layoutX, float layoutY, float yawDegrees, float dt, float footY = 0f)
         {
-            var pos = WorldScale.ToWorld(layoutX, layoutY, 0f);
+            var pos = WorldScale.ToWorld(layoutX, layoutY, footY);
             Root.position = pos;
             if (!firstPerson) Root.rotation = Quaternion.Euler(0f, yawDegrees, 0f);
             Animate(pos, dt);
@@ -225,7 +225,7 @@ namespace Vacancy
         public void SyncFirstPerson(PlayerActor player, float dt)
         {
             if (!firstPerson || player == null) return;
-            var pos = WorldScale.ToWorld(player.X, player.Y, 0f);
+            var pos = WorldScale.ToWorld(player.X, player.Y, player.FootY);
             var yaw = Quaternion.Euler(0f, player.Yaw, 0f);
             Root.position = humanoid ? pos - yaw * Vector3.forward * FirstPersonBack : pos;
             Root.rotation = yaw;

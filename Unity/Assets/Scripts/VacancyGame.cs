@@ -15,6 +15,9 @@ namespace Vacancy
         Camera playerCam;
         readonly GameInput input = new GameInput();
         bool bannerOpen;
+        bool inspectMode;
+        string lastPin;
+        Vector3? lastPinWorld;
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         static void AutoStart()
@@ -75,6 +78,15 @@ namespace Vacancy
 
             if (input.VacancyPressed && !AnyModalOpen()) ToggleVacancy();
 
+            if (input.InspectPressed && !AnyModalOpen() && !state.PauseMenuOpen && !bannerOpen)
+            {
+                inspectMode = !inspectMode;
+                state.AddLog(
+                    inspectMode
+                        ? "Inspect mode ON — click a spot (cursor unlocked) to pin it. X to exit."
+                        : "Inspect mode OFF.");
+            }
+
             if (!bannerOpen)
             {
                 var pending = Story.TakeBanner(state);
@@ -111,13 +123,15 @@ namespace Vacancy
             }
 
             view.Refresh(state, player, StaffList());
+            if (inspectMode && !AnyModalOpen() && !state.Paused) UpdateInspectPin(input.ClickPressed);
+            else view?.SetInspect(false, null, null);
             hud.Refresh();
         }
 
         void LateUpdate()
         {
             if (player == null || playerCam == null) return;
-            playerCam.transform.position = WorldScale.ToWorld(player.X, player.Y, WorldScale.EyeHeight);
+            playerCam.transform.position = WorldScale.ToWorld(player.X, player.Y, WorldScale.EyeHeight + player.FootY);
             playerCam.transform.rotation = Quaternion.Euler(player.Pitch, player.Yaw, 0f);
             view?.SyncPlayer(player, Time.deltaTime);
         }
@@ -497,6 +511,48 @@ namespace Vacancy
             }
 
             return cam;
+        }
+
+        void UpdateInspectPin(bool clicked)
+        {
+            if (playerCam == null || view == null || layout == null) return;
+            var ray = playerCam.ScreenPointToRay(Input.mousePosition);
+            string hover = lastPin;
+            Vector3? world = lastPinWorld;
+            var hits = Physics.RaycastAll(ray, 90f);
+            System.Array.Sort(hits, (a, b) => a.distance.CompareTo(b.distance));
+            foreach (var hit in hits)
+            {
+                if (IsCharacterHit(hit.collider)) continue;
+                WorldScale.FromWorld(hit.point, out float x, out float y);
+                int floor = hit.point.y < -WorldScale.FloorDepth * 0.45f ? -1 : 0;
+                hover = HotelLayout.FormatPin(layout.AreaLabelAt(x, y, floor), x, y);
+                world = hit.point + Vector3.up * 0.04f;
+                if (clicked && (hud == null || !hud.PointerOverHud()))
+                {
+                    lastPin = hover;
+                    lastPinWorld = world;
+                    state.AddLog(hover);
+                }
+
+                break;
+            }
+
+            view.SetInspect(true, hover, world);
+        }
+
+        static bool IsCharacterHit(Collider collider)
+        {
+            if (collider == null) return false;
+            var t = collider.transform;
+            while (t != null)
+            {
+                string n = t.name;
+                if (n == "Player" || n.StartsWith("Char")) return true;
+                t = t.parent;
+            }
+
+            return false;
         }
 
         static void ApplyCursor(bool look)

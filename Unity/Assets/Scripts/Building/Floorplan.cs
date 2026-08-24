@@ -10,6 +10,9 @@ namespace Vacancy
         public const string Office = "office";
         public const string Department = "department";
         public const string Parking = "parking";
+        public const string Stairs = "stairs";
+        public const string Basement = "basement";
+        public const string Storage = "storage";
     }
 
     public sealed class BandSpec
@@ -46,6 +49,7 @@ namespace Vacancy
         public List<Door> Doors = new List<Door>();
         public int? RoomId;
         public string DepartmentId;
+        public int Level;
     }
 
     public sealed class PlannedRoom
@@ -105,6 +109,8 @@ namespace Vacancy
         public Point RoomSize;
         public Rect Lobby;
         public Rect Parking;
+        public Rect Basement;
+        public Rect Stairs;
         public OfficeSpot Office;
         public DeskSpot FrontDesk;
         public Dictionary<string, DepartmentSpot> Departments = new Dictionary<string, DepartmentSpot>();
@@ -136,7 +142,8 @@ namespace Vacancy
 
         static readonly HashSet<string> PublicKinds = new HashSet<string>
         {
-            AreaKind.Corridor, AreaKind.Lobby, AreaKind.Department, AreaKind.Parking
+            AreaKind.Corridor, AreaKind.Lobby, AreaKind.Department, AreaKind.Parking,
+            AreaKind.Stairs, AreaKind.Basement, AreaKind.Storage
         };
 
         static readonly DepartmentDef[] Departments =
@@ -303,12 +310,32 @@ namespace Vacancy
 
                     float officeW = Down(300);
                     float officeH = Down(100);
-                    var officeRect = new Rect(
+                    float stairW = Down(90);
+                    var backBlock = new Rect(
                         lobbyRect.X + Down((lobbyRect.W - officeW) / 2f),
                         lobbyRect.Y + Down(20),
                         officeW,
                         officeH);
-                    var officeDoor = MakeDoor(officeRect, "south", spec.DoorWidth, 0.5f, tile);
+                    var stairsRect = new Rect(backBlock.X, backBlock.Y, stairW, officeH);
+                    var officeRect = new Rect(
+                        backBlock.X + stairW,
+                        backBlock.Y,
+                        officeW - stairW,
+                        officeH);
+                    var stairsSouth = MakeDoor(stairsRect, "south", spec.DoorWidth, 0.82f, tile);
+                    var stairsEast = MakeDoor(stairsRect, "east", spec.DoorWidth, 0.5f, tile);
+                    floor.Areas.Add(new FloorArea
+                    {
+                        Id = "stairs",
+                        Kind = AreaKind.Stairs,
+                        Label = "Basement stairs",
+                        Rect = stairsRect,
+                        Walls = true,
+                        Doors = new List<Door> { stairsSouth, stairsEast }
+                    });
+                    floor.Stairs = stairsRect;
+                    var officeDoor = MakeDoor(officeRect, "south", spec.DoorWidth, 0.55f, tile);
+                    var officeWest = MakeDoor(officeRect, "west", spec.DoorWidth, 0.5f, tile);
                     floor.Areas.Add(new FloorArea
                     {
                         Id = "office",
@@ -317,7 +344,7 @@ namespace Vacancy
                         Label = "Office",
                         Rect = officeRect,
                         Walls = true,
-                        Doors = new List<Door> { officeDoor }
+                        Doors = new List<Door> { officeDoor, officeWest }
                     });
                     var officeCenter = officeRect.Center;
                     floor.Office = new OfficeSpot
@@ -335,8 +362,8 @@ namespace Vacancy
                     float staffAlley = Down(60);
                     floor.FrontDesk = new DeskSpot
                     {
-                        X = officeRect.X + officeRect.W / 2f,
-                        Y = officeRect.Y + officeRect.H + staffAlley + deskH / 2f,
+                        X = backBlock.X + backBlock.W / 2f,
+                        Y = backBlock.Y + backBlock.H + staffAlley + deskH / 2f,
                         W = Down(160),
                         H = deskH
                     };
@@ -352,39 +379,6 @@ namespace Vacancy
                         Label = "Service corridor",
                         Rect = bandRect
                     });
-
-                    foreach (var dept in Departments)
-                    {
-                        float deptW = Down(170);
-                        var deptRect = new Rect(
-                            dept.Side == "left"
-                                ? bandRect.X + tile
-                                : bandRect.X + bandRect.W - deptW - tile,
-                            bandRect.Y + tile,
-                            deptW,
-                            bandRect.H - tile * 2f);
-                        floor.Areas.Add(new FloorArea
-                        {
-                            Id = dept.Id,
-                            Kind = AreaKind.Department,
-                            Label = dept.Label,
-                            Accent = dept.Accent,
-                            Rect = deptRect,
-                            DepartmentId = dept.Id
-                        });
-                        var center = deptRect.Center;
-                        floor.Departments[dept.Id] = new DepartmentSpot
-                        {
-                            Id = dept.Id,
-                            Label = dept.Label,
-                            Accent = dept.Accent,
-                            Rect = deptRect,
-                            X = center.X,
-                            Y = center.Y,
-                            W = deptRect.W,
-                            H = deptRect.H
-                        };
-                    }
                 }
                 else
                 {
@@ -400,8 +394,81 @@ namespace Vacancy
                 cursorY += height;
             }
 
+            AttachBasement(floor, spec.DoorWidth, tile);
             PruneUnusableDoors(floor.Areas, tile);
             return floor;
+        }
+
+        static void AttachBasement(BuiltFloor floor, float doorWidth, float tile)
+        {
+            var lobby = floor.Lobby;
+            if (lobby.W <= 0f || lobby.H <= 0f) return;
+
+            float Down(float value) => (float)(System.Math.Floor(value / tile) * tile);
+            floor.Basement = lobby;
+            floor.Areas.Add(new FloorArea
+            {
+                Id = "basement",
+                Kind = AreaKind.Basement,
+                Label = "Basement",
+                Rect = lobby,
+                Walls = true,
+                Level = -1
+            });
+
+            float storeW = Down(140);
+            float storeH = Down(70);
+            var storeRect = new Rect(
+                lobby.X + Down((lobby.W - storeW) / 2f),
+                lobby.Y + Down(24),
+                storeW,
+                storeH);
+            floor.Areas.Add(new FloorArea
+            {
+                Id = "storage",
+                Kind = AreaKind.Storage,
+                Label = "Storage",
+                Rect = storeRect,
+                Level = -1
+            });
+
+            foreach (var dept in Departments)
+            {
+                float deptW = Down(170);
+                float deptH = Down(80);
+                var deptRect = new Rect(
+                    dept.Side == "left"
+                        ? lobby.X + tile * 2f
+                        : lobby.X + lobby.W - deptW - tile * 2f,
+                    lobby.Y + lobby.H - deptH - tile * 2f,
+                    deptW,
+                    deptH);
+                var door = MakeDoor(deptRect, dept.Side == "left" ? "east" : "west", doorWidth, 0.5f, tile);
+                floor.Areas.Add(new FloorArea
+                {
+                    Id = dept.Id,
+                    Kind = AreaKind.Department,
+                    Label = dept.Label,
+                    Accent = dept.Accent,
+                    Rect = deptRect,
+                    Walls = true,
+                    Doors = new List<Door> { door },
+                    DepartmentId = dept.Id,
+                    Level = -1
+                });
+                var center = deptRect.Center;
+                floor.Departments[dept.Id] = new DepartmentSpot
+                {
+                    Id = dept.Id,
+                    Label = dept.Label,
+                    Accent = dept.Accent,
+                    Rect = deptRect,
+                    X = center.X,
+                    Y = center.Y,
+                    W = deptRect.W,
+                    H = deptRect.H
+                };
+            }
         }
 
         static float[] ResolveBandHeights(List<BandSpec> bands, float totalHeight, float roomHeight, float tile)
@@ -527,13 +594,10 @@ namespace Vacancy
 
         static bool IsOpenSpace(FloorArea area, Point point, float tile)
         {
-            if (!PublicKinds.Contains(area.Kind)) return false;
+            if (!PublicKinds.Contains(area.Kind) && area.Kind != AreaKind.Office) return false;
             var r = area.Rect;
             float pad = area.Walls ? tile : 0f;
-            return point.X >= r.X + pad &&
-                   point.X <= r.X + r.W - pad &&
-                   point.Y >= r.Y + pad &&
-                   point.Y <= r.Y + r.H - pad;
+            return r.Contains(point, pad);
         }
     }
 }

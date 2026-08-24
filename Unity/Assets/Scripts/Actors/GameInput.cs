@@ -13,6 +13,8 @@ namespace Vacancy
         public bool VacancyPressed;
         public bool ReinforcePressed;
         public bool EscapePressed;
+        public bool InspectPressed;
+        public bool ClickPressed;
         public float LookX;
         public float LookY;
         public bool LookEnabled;
@@ -29,6 +31,8 @@ namespace Vacancy
             VacancyPressed = Pressed(KeyCode.V);
             ReinforcePressed = Pressed(KeyCode.R);
             EscapePressed = Pressed(KeyCode.Escape);
+            InspectPressed = Pressed(KeyCode.X);
+            ClickPressed = !lookEnabled && Input.GetMouseButtonDown(0);
 
             if (lookEnabled)
             {

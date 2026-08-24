@@ -27,6 +27,8 @@ namespace Vacancy
         public ActiveTask ActiveTask;
         public List<Point> Path { get; set; } = new List<Point>();
         public float StallSeconds { get; set; }
+        public int FloorLevel { get; set; }
+        public float FootY { get; set; }
 
         public PlayerActor(float x, float y)
         {
@@ -101,13 +103,14 @@ namespace Vacancy
             float nextY = Y + dy * speed;
             const string allow = "player";
 
-            if (!Pathing.CollidesWithRooms(nextX, Y, Radius, rooms, layout, allow)) X = nextX;
-            if (!Pathing.CollidesWithRooms(X, nextY, Radius, rooms, layout, allow)) Y = nextY;
+            if (!Pathing.CollidesWithRooms(nextX, Y, Radius, rooms, layout, allow, FloorLevel)) X = nextX;
+            if (!Pathing.CollidesWithRooms(X, nextY, Radius, rooms, layout, allow, FloorLevel)) Y = nextY;
 
-            var walk = layout.WalkBounds.W > 0 ? layout.WalkBounds : layout.Building;
+            var walk = layout.WalkRect(FloorLevel);
             X = Geometry.Clamp(X, walk.X + 20, walk.X + walk.W - 20);
             Y = Geometry.Clamp(Y, walk.Y + 24, walk.Y + walk.H - 16);
             Pathing.ResolveRoomCollision(this, rooms, layout, allow);
+            layout.UpdateElevation(this);
             return null;
         }
 

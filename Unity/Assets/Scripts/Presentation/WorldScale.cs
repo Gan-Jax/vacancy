@@ -12,7 +12,9 @@ namespace Vacancy
         public const float EyeHeight = 1.6f;
         public const float WallHeight = 2.8f;
         public const float CeilingY = 2.85f;
+        public const float FloorDepth = 3.2f;
         public const float LookSensitivity = 2.4f;
+        public static float BasementFloorY => -FloorDepth;
 
         public static Vector3 ToWorld(float layoutX, float layoutY, float height = 0f)
         {
@@ -25,5 +27,11 @@ namespace Vacancy
         }
 
         public static float Meters(float layoutUnits) => layoutUnits / UnitsPerMeter;
+
+        public static void FromWorld(Vector3 world, out float layoutX, out float layoutY)
+        {
+            layoutX = world.x * UnitsPerMeter;
+            layoutY = world.z * UnitsPerMeter;
+        }
     }
 }

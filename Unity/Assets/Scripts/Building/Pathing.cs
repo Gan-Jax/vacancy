@@ -61,15 +61,16 @@ namespace Vacancy
             return permits;
         }
 
-        public static bool CollidesWithRooms(float x, float y, float radius, List<Room> rooms, HotelLayout layout, object allowRoomId)
+        public static bool CollidesWithRooms(float x, float y, float radius, List<Room> rooms, HotelLayout layout, object allowRoomId, int floorLevel = 0)
         {
-            if (layout.NavGrid == null) return false;
-            return Navigation.IsCircleBlocked(layout.NavGrid, x, y, radius, BuildPermits(rooms, allowRoomId));
+            var grid = layout?.GridFor(floorLevel);
+            if (grid == null) return false;
+            return Navigation.IsCircleBlocked(grid, x, y, radius, BuildPermits(rooms, allowRoomId));
         }
 
         public static void ResolveRoomCollision(IMover entity, List<Room> rooms, HotelLayout layout, object allowRoomId)
         {
-            var grid = layout.NavGrid;
+            var grid = layout?.GridFor(entity.FloorLevel);
             if (grid == null) return;
             var permits = BuildPermits(rooms, allowRoomId);
             if (!Navigation.IsCircleBlocked(grid, entity.X, entity.Y, entity.Radius, permits)) return;
@@ -84,15 +85,44 @@ namespace Vacancy
         public static List<Point> FindPath(HotelLayout layout, float fromX, float fromY, Point? goal, PathOptions options = null)
         {
             if (goal == null) return new List<Point>();
-            var grid = layout.NavGrid;
-            if (grid == null) return new List<Point> { goal.Value };
-
             options = options ?? new PathOptions();
             var permits = options.Permits ?? BuildPermits(options.Rooms ?? new List<Room>(), options.AllowRoomId);
             float radius = options.Radius ?? 11f;
-            var route = Navigation.FindRoute(grid, new Point(fromX, fromY), goal.Value, permits, radius);
+            int fromFloor = options.FromFloor ?? 0;
+            int toFloor = options.ToFloor ?? layout.GuessFloor(goal.Value);
+
+            var route = FindRouteAcross(layout, new Point(fromX, fromY), goal.Value, fromFloor, toFloor, permits, radius);
             if (route == null || route.Count == 0) return new List<Point> { goal.Value };
             return route;
+        }
+
+        static List<Point> FindRouteAcross(
+            HotelLayout layout,
+            Point from,
+            Point to,
+            int fromFloor,
+            int toFloor,
+            HashSet<string> permits,
+            float radius)
+        {
+            var fromGrid = layout.GridFor(fromFloor);
+            var toGrid = layout.GridFor(toFloor);
+            if (fromGrid == null) return new List<Point> { to };
+            if (fromFloor == toFloor || fromGrid == toGrid)
+            {
+                return Navigation.FindRoute(fromGrid, from, to, permits, radius);
+            }
+
+            Point fromPortal = fromFloor < 0 ? layout.StairsBottom : layout.StairsTop;
+            Point toPortal = toFloor < 0 ? layout.StairsBottom : layout.StairsTop;
+            var first = Navigation.FindRoute(fromGrid, from, fromPortal, permits, radius);
+            var second = Navigation.FindRoute(toGrid, toPortal, to, permits, radius);
+            if (first == null || second == null) return null;
+
+            var combined = new List<Point>(first.Count + second.Count);
+            combined.AddRange(first);
+            combined.AddRange(second);
+            return combined;
         }
 
         public static List<Point> PathToRoomDoor(HotelLayout layout, float fromX, float fromY, int roomId, PathOptions options = null)
@@ -102,6 +132,8 @@ namespace Vacancy
 
         public static List<Point> PathToDeskHall(HotelLayout layout, float fromX, float fromY, PathOptions options = null)
         {
+            options = options ?? new PathOptions();
+            if (options.ToFloor == null) options.ToFloor = 0;
             return FindPath(layout, fromX, fromY, layout.DeskApproach(), options);
         }
 
@@ -114,10 +146,11 @@ namespace Vacancy
             {
                 entity.X = tx;
                 entity.Y = ty;
+                layout?.UpdateElevation(entity);
                 return true;
             }
 
-            var grid = layout.NavGrid;
+            var grid = layout?.GridFor(entity.FloorLevel);
             var permits = BuildPermits(rooms, allowRoomId);
             float len = dist > 0 ? dist : 1f;
             float travel = System.Math.Min(speed * dt, dist);
@@ -140,10 +173,12 @@ namespace Vacancy
                 entity.X = nx;
                 entity.Y = ny;
                 ClampToBuilding(entity, layout);
+                layout?.UpdateElevation(entity);
                 return Geometry.Dist(entity.X, entity.Y, tx, ty) < 3f;
             }
 
             ResolveRoomCollision(entity, rooms, layout, allowRoomId);
+            layout?.UpdateElevation(entity);
             return false;
         }
 
@@ -171,7 +206,8 @@ namespace Vacancy
                     {
                         Rooms = rooms,
                         AllowRoomId = allowRoomId,
-                        Radius = entity.Radius
+                        Radius = entity.Radius,
+                        FromFloor = entity.FloorLevel
                     });
                     return false;
                 }
@@ -189,7 +225,7 @@ namespace Vacancy
 
         static void ClampToBuilding(IMover entity, HotelLayout layout)
         {
-            var b = layout.WalkBounds.W > 0 ? layout.WalkBounds : layout.Building;
+            var b = layout.WalkRect(entity.FloorLevel);
             entity.X = Geometry.Clamp(entity.X, b.X + 4, b.X + b.W - 4);
             entity.Y = Geometry.Clamp(entity.Y, b.Y + 4, b.Y + b.H - 4);
         }
@@ -202,6 +238,8 @@ namespace Vacancy
         float Radius { get; }
         List<Point> Path { get; set; }
         float StallSeconds { get; set; }
+        int FloorLevel { get; set; }
+        float FootY { get; set; }
     }
 
     public sealed class PathOptions
@@ -210,5 +248,7 @@ namespace Vacancy
         public List<Room> Rooms;
         public object AllowRoomId;
         public float? Radius;
+        public int? FromFloor;
+        public int? ToFloor;
     }
 }

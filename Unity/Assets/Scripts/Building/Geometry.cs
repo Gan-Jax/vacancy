@@ -28,6 +28,13 @@ namespace Vacancy
         }
 
         public Point Center => new Point(X + W / 2f, Y + H / 2f);
+
+        public bool Contains(float px, float py, float pad = 0f)
+        {
+            return px >= X + pad && px <= X + W - pad && py >= Y + pad && py <= Y + H - pad;
+        }
+
+        public bool Contains(Point point, float pad = 0f) => Contains(point.X, point.Y, pad);
     }
 
     public sealed class Door

@@ -80,6 +80,8 @@ namespace Vacancy
         public int? ReputationBonus;
         public bool UpsetCheckout;
         public float StallSeconds { get; set; }
+        public int FloorLevel { get; set; }
+        public float FootY { get; set; }
     }
 
     public sealed class GameState

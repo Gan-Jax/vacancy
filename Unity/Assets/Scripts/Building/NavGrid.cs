@@ -34,18 +34,20 @@ namespace Vacancy
         const float StraightCost = 10f;
         const float DiagonalCost = 14f;
 
-        public static NavGrid Build(BuiltFloor floor)
+        public static NavGrid Build(BuiltFloor floor, int level = 0, Rect? bounds = null)
         {
             float tile = floor.Tile;
-            int cols = (int)Math.Ceiling(floor.Bounds.W / tile);
-            int rows = (int)Math.Ceiling(floor.Bounds.H / tile);
+            var used = bounds ?? floor.Bounds;
+            if (used.W <= 0f || used.H <= 0f) used = floor.Bounds;
+            int cols = (int)Math.Ceiling(used.W / tile);
+            int rows = (int)Math.Ceiling(used.H / tile);
             var grid = new NavGrid
             {
-                FloorId = floor.Id,
-                Level = floor.Level,
+                FloorId = level < 0 ? "basement" : floor.Id,
+                Level = level,
                 Tile = tile,
-                OriginX = floor.Bounds.X,
-                OriginY = floor.Bounds.Y,
+                OriginX = used.X,
+                OriginY = used.Y,
                 Cols = cols,
                 Rows = rows,
                 Blocked = new byte[cols * rows],
@@ -54,9 +56,15 @@ namespace Vacancy
 
             for (int i = 0; i < grid.Blocked.Length; i++) grid.Blocked[i] = 1;
 
-            foreach (var area in floor.Areas) StampArea(grid, area);
             foreach (var area in floor.Areas)
             {
+                if (area.Level != level) continue;
+                StampArea(grid, area);
+            }
+
+            foreach (var area in floor.Areas)
+            {
+                if (area.Level != level) continue;
                 if (area.Doors == null) continue;
                 foreach (var door in area.Doors) CarveDoor(grid, area, door);
             }
@@ -432,6 +440,7 @@ namespace Vacancy
 
             foreach (var dept in floor.Departments.Values)
             {
+                if (DepartmentIsBasement(floor, dept)) continue;
                 if (FindRoute(grid, from, new Point(dept.X, dept.Y), null, 12f) == null)
                 {
                     problems.Add($"{dept.Label} is unreachable");
@@ -439,6 +448,16 @@ namespace Vacancy
             }
 
             return problems;
+        }
+
+        static bool DepartmentIsBasement(BuiltFloor floor, DepartmentSpot dept)
+        {
+            foreach (var area in floor.Areas)
+            {
+                if (area.DepartmentId == dept.Id) return area.Level < 0;
+            }
+
+            return false;
         }
 
         sealed class MinHeap
