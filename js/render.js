@@ -1,6 +1,6 @@
 import { getRepairCost, getRoomUnlockCost } from "./economy.js";
 import { CONFIG } from "./config.js";
-import { AREA, FLAGSHIP_GROUND, createFloor } from "./floorplan.js";
+import { AREA, FLAGSHIP_GROUND, createFloor, innBuildingRect } from "./floorplan.js";
 import { buildNavGrid, validateFloor } from "./nav.js";
 
 /** Keyboard input helper. */
@@ -72,7 +72,7 @@ export function createInput() {
 export function createLayout(canvas) {
   const width = canvas.width;
   const height = canvas.height;
-  const building = { x: 48, y: 40, w: width - 96, h: height - 108 };
+  const building = innBuildingRect(FLAGSHIP_GROUND, width, height);
 
   const floor = createFloor(FLAGSHIP_GROUND, building);
   const navGrid = buildNavGrid(floor);
@@ -362,6 +362,7 @@ export function drawWorld(ctx, state, layout, player, staffList = []) {
       ctx.fillStyle = "#dbc5a2";
       ctx.font = "bold 14px Segoe UI";
       ctx.fillText("Lobby", area.rect.x + 16, area.rect.y + 26);
+      drawLobbySeating(ctx, area.rect);
     } else if (area.kind === AREA.OFFICE) {
       drawWalledArea(ctx, area, tile, COLORS.officeWall, COLORS.officeFloor);
       drawOfficeFittings(ctx, area);
@@ -521,6 +522,18 @@ function drawDepartment(ctx, area) {
   ctx.fillStyle = area.accent ?? "#e8edf5";
   ctx.font = "bold 11px Segoe UI";
   ctx.fillText(area.label, r.x + 10, r.y + 20);
+}
+
+function drawLobbySeating(ctx, lobby) {
+  const sitX = lobby.x + lobby.w / 2 + 20;
+  const sitY = lobby.y + lobby.h * 0.62;
+  ctx.fillStyle = "#4a2f2a";
+  ctx.fillRect(sitX - 130, sitY - 70, 260, 140);
+  ctx.fillStyle = "#5c4a3a";
+  ctx.fillRect(sitX - 80, sitY + 36, 160, 32);
+  ctx.fillRect(sitX - 80, sitY - 64, 160, 32);
+  ctx.fillStyle = "#3a2a20";
+  ctx.fillRect(sitX - 36, sitY - 18, 72, 36);
 }
 
 function drawFrontDesk(ctx, desk) {

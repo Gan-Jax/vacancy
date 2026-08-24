@@ -27,7 +27,7 @@ namespace Vacancy
 
         public static HotelLayout Create(float width = 1360f, float height = 820f)
         {
-            var building = new Rect(48, 40, width - 96, height - 108);
+            var building = Floorplan.InnBuildingRect(Floorplan.FlagshipGround, width, height);
             var floor = Floorplan.CreateFloor(Floorplan.FlagshipGround, building);
             var navGrid = Navigation.Build(floor);
             var desk = floor.FrontDesk;

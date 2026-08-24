@@ -38,17 +38,15 @@ export const FLAGSHIP_GROUND = {
   sideCorridor: 50,
   /** Door openings are this wide — comfortably clear of body radii. */
   doorWidth: 40,
+  /** Keep the lobby square: six rooms across, not a ten-room bowling alley. */
+  maxRoomsPerRow: 6,
   roomSize: { w: CONFIG.roomWidth, h: CONFIG.roomHeight },
   bands: [
-    // Two room rows share the first corridor (double-loaded), and the lobby is
-    // flanked by corridors so its doors always open onto walkable space.
     { kind: "rooms", doorSide: "south" },
-    { kind: "corridor", height: 50 },
+    { kind: "corridor", height: 40 },
     { kind: "rooms", doorSide: "north" },
-    { kind: "corridor", height: 50 },
-    { kind: "lobby", height: 150, grow: true },
-    { kind: "corridor", height: 50 },
-    { kind: "rooms", doorSide: "north" },
+    { kind: "corridor", height: 40 },
+    { kind: "lobby", height: 280, grow: true },
     { kind: "service", height: 90 },
   ],
 };
@@ -60,6 +58,22 @@ const DEPARTMENTS = [
   { id: "housekeeping", label: "Mary's room", side: "left", accent: "#e8a0bf" },
   { id: "maintenance", label: "Bob's closet", side: "right", accent: "#ffb347" },
 ];
+
+/** Tight building shell for a capped room row, centered on the lot. */
+export function innBuildingRect(spec, lotWidth, lotHeight, marginX = 48, marginY = 40) {
+  const tile = spec.tile;
+  const down = (value) => Math.floor(value / tile) * tile;
+  const roomW = down(spec.roomSize.w);
+  const cols = spec.maxRoomsPerRow ?? 6;
+  const innW = cols * roomW + down(spec.sideCorridor) * 2 + down(spec.edge) * 2;
+  const innH = lotHeight - marginY - 68;
+  return {
+    x: down((lotWidth - innW) / 2),
+    y: marginY,
+    w: innW,
+    h: down(innH),
+  };
+}
 
 /**
  * Build one floor from a spec.
@@ -86,10 +100,13 @@ export function createFloor(spec, bounds) {
 
   // Guest rooms sit flush in a centered block; leftover space widens the
   // vertical side corridors. Room count is therefore a function of space.
-  const roomsPerRow = Math.max(
+  const fit = Math.max(
     1,
     Math.floor((content.w - down(spec.sideCorridor) * 2) / roomSize.w)
   );
+  const roomsPerRow = spec.maxRoomsPerRow
+    ? Math.min(fit, spec.maxRoomsPerRow)
+    : fit;
   const roomsBlockW = roomsPerRow * roomSize.w;
   const roomsBlockX = content.x + down((content.w - roomsBlockW) / 2);
 
@@ -167,10 +184,10 @@ export function createFloor(spec, bounds) {
       });
 
       const officeRect = {
-        x: lobbyRect.x + down(30),
-        y: lobbyRect.y + down(30),
-        w: down(150),
-        h: down(height - 60),
+        x: lobbyRect.x + down(20),
+        y: lobbyRect.y + down(20),
+        w: down(140),
+        h: down(120),
       };
       const officeDoor = makeDoor(officeRect, "east", spec.doorWidth, 0.5, tile);
       areas.push({
@@ -192,10 +209,10 @@ export function createFloor(spec, bounds) {
       };
 
       frontDesk = {
-        x: lobbyRect.x + lobbyRect.w / 2 + 70,
-        y: lobbyRect.y + lobbyRect.h / 2,
-        w: 150,
-        h: 54,
+        x: lobbyRect.x + lobbyRect.w * 0.62,
+        y: lobbyRect.y + down(48),
+        w: 160,
+        h: 50,
       };
 
       pushSideCorridors(areas, content, bandRect, roomsBlockX, roomsBlockW);

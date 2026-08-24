@@ -29,6 +29,7 @@ namespace Vacancy
         public float SideCorridor;
         public float DoorWidth;
         public Point RoomSize;
+        public int MaxRoomsPerRow;
         public List<BandSpec> Bands;
     }
 
@@ -119,15 +120,14 @@ namespace Vacancy
             SideCorridor = 50,
             DoorWidth = 40,
             RoomSize = new Point(GameConfig.RoomWidth, GameConfig.RoomHeight),
+            MaxRoomsPerRow = 6,
             Bands = new List<BandSpec>
             {
                 new BandSpec { Kind = "rooms", DoorSide = "south" },
-                new BandSpec { Kind = "corridor", Height = 50 },
+                new BandSpec { Kind = "corridor", Height = 40 },
                 new BandSpec { Kind = "rooms", DoorSide = "north" },
-                new BandSpec { Kind = "corridor", Height = 50 },
-                new BandSpec { Kind = "lobby", Height = 150, Grow = true },
-                new BandSpec { Kind = "corridor", Height = 50 },
-                new BandSpec { Kind = "rooms", DoorSide = "north" },
+                new BandSpec { Kind = "corridor", Height = 40 },
+                new BandSpec { Kind = "lobby", Height = 280, Grow = true },
                 new BandSpec { Kind = "service", Height = 90 }
             }
         };
@@ -159,6 +159,17 @@ namespace Vacancy
             }
         }
 
+        public static Rect InnBuildingRect(FloorSpec spec, float lotWidth, float lotHeight, float marginX = 48f, float marginY = 40f)
+        {
+            float tile = spec.Tile;
+            float Down(float value) => (float)(System.Math.Floor(value / tile) * tile);
+            float roomW = Down(spec.RoomSize.X);
+            int cols = spec.MaxRoomsPerRow > 0 ? spec.MaxRoomsPerRow : 6;
+            float innW = cols * roomW + Down(spec.SideCorridor) * 2f + Down(spec.Edge) * 2f;
+            float innH = Down(lotHeight - marginY - 68f);
+            return new Rect(Down((lotWidth - innW) / 2f), marginY, innW, innH);
+        }
+
         public static BuiltFloor CreateFloor(FloorSpec spec, Rect bounds)
         {
             float tile = spec.Tile;
@@ -172,9 +183,10 @@ namespace Vacancy
                 Down(bounds.H - edge * 2f));
 
             var roomSize = new Point(Down(spec.RoomSize.X), Down(spec.RoomSize.Y));
-            int roomsPerRow = System.Math.Max(
+            int fit = System.Math.Max(
                 1,
                 (int)System.Math.Floor((content.W - Down(spec.SideCorridor) * 2f) / roomSize.X));
+            int roomsPerRow = spec.MaxRoomsPerRow > 0 ? System.Math.Min(fit, spec.MaxRoomsPerRow) : fit;
             float roomsBlockW = roomsPerRow * roomSize.X;
             float roomsBlockX = content.X + Down((content.W - roomsBlockW) / 2f);
 
@@ -259,10 +271,10 @@ namespace Vacancy
                     });
 
                     var officeRect = new Rect(
-                        lobbyRect.X + Down(30),
-                        lobbyRect.Y + Down(30),
-                        Down(150),
-                        Down(height - 60));
+                        lobbyRect.X + Down(20),
+                        lobbyRect.Y + Down(20),
+                        Down(140),
+                        Down(120));
                     var officeDoor = MakeDoor(officeRect, "east", spec.DoorWidth, 0.5f, tile);
                     floor.Areas.Add(new FloorArea
                     {
@@ -288,10 +300,10 @@ namespace Vacancy
 
                     floor.FrontDesk = new DeskSpot
                     {
-                        X = lobbyRect.X + lobbyRect.W / 2f + 70f,
-                        Y = lobbyRect.Y + lobbyRect.H / 2f,
-                        W = 150,
-                        H = 54
+                        X = lobbyRect.X + lobbyRect.W * 0.62f,
+                        Y = lobbyRect.Y + Down(48),
+                        W = 160,
+                        H = 50
                     };
 
                     PushSideCorridors(floor.Areas, content, bandRect, roomsBlockX, roomsBlockW);

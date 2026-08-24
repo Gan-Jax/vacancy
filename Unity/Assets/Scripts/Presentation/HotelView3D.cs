@@ -187,6 +187,16 @@ namespace Vacancy
                 0.04f,
                 Palette.Paper);
 
+            var lobby = layout.Lobby;
+            float sitX = lobby.Center.X + 20f;
+            float sitY = lobby.Y + lobby.H * 0.62f;
+            Box("Rug", new Rect(sitX - 130, sitY - 70, 260, 140), 0.055f, 0.02f, Palette.Hex("#4a2f2a"));
+            Box("CouchSouth", new Rect(sitX - 80, sitY + 36, 160, 32), 0.28f, 0.42f, Palette.Hex("#5c4a3a"));
+            Box("CouchNorth", new Rect(sitX - 80, sitY - 64, 160, 32), 0.28f, 0.42f, Palette.Hex("#5c4a3a"));
+            Box("CoffeeTable", new Rect(sitX - 36, sitY - 18, 72, 36), 0.32f, 0.28f, Palette.Hex("#3a2a20"));
+            Box("PlantSW", new Rect(lobby.X + 24, lobby.Y + lobby.H - 56, 22, 22), 0.55f, 1f, Palette.Hex("#2f5a3a"));
+            Box("PlantSE", new Rect(lobby.X + lobby.W - 46, lobby.Y + lobby.H - 56, 22, 22), 0.55f, 1f, Palette.Hex("#2f5a3a"));
+
             if (layout.Office != null)
             {
                 var office = layout.Office.Rect;
@@ -244,8 +254,9 @@ namespace Vacancy
             sun.color = new Color(0.75f, 0.82f, 1f);
             sun.shadows = LightShadows.None;
 
-            PointLight("LobbyLight", layout.Lobby.Center.X, layout.Lobby.Center.Y, 2.4f, 16f, 1.6f, new Color(1f, 0.86f, 0.7f));
-            PointLight("DeskLight", layout.FrontDesk.X, layout.FrontDesk.Y, 2.2f, 10f, 1.2f, new Color(1f, 0.9f, 0.75f));
+            PointLight("LobbyLight", layout.Lobby.Center.X, layout.Lobby.Center.Y, 2.4f, 14f, 1.5f, new Color(1f, 0.86f, 0.7f));
+            PointLight("SeatingLight", layout.Lobby.Center.X + 20f, layout.Lobby.Y + layout.Lobby.H * 0.62f, 2.2f, 10f, 1.1f, new Color(1f, 0.82f, 0.62f));
+            PointLight("DeskLight", layout.FrontDesk.X, layout.FrontDesk.Y, 2.2f, 9f, 1.2f, new Color(1f, 0.9f, 0.75f));
 
             int corridorLights = 0;
             foreach (var area in layout.Floor.Areas)
