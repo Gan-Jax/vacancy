@@ -121,16 +121,38 @@ namespace Vacancy
         public static string HudBody(GameState state)
         {
             if (!IsStageOne(state) || state.Tutorial == null) return "";
+            return ObjectiveLines(state, true);
+        }
+
+        public static string JournalBody(GameState state)
+        {
             var lines = new List<string>();
-            foreach (var item in Objectives)
+            lines.Add(IsStageOne(state) ? "Today's work at the inn." : "The inn is running.");
+            lines.Add("");
+            lines.Add(ObjectiveLines(state, IsStageOne(state)));
+            return string.Join("\n", lines);
+        }
+
+        static string ObjectiveLines(GameState state, bool includeNote)
+        {
+            var lines = new List<string>();
+            if (state?.Tutorial != null)
             {
-                TryGet(state.Tutorial, item.Id, out bool done);
-                lines.Add((done ? "[x] " : "[ ] ") + item.Label);
+                foreach (var item in Objectives)
+                {
+                    TryGet(state.Tutorial, item.Id, out bool done);
+                    lines.Add((done ? "[x] " : "[ ] ") + item.Label);
+                }
             }
 
-            lines.Add($"Rooms open: {UnlockedRoomCount(state)} / {RoomGate}");
-            string note = HudNote(state);
-            if (!string.IsNullOrEmpty(note)) lines.Add(note);
+            int rooms = state?.Rooms?.Count ?? RoomGate;
+            lines.Add($"Rooms open: {UnlockedRoomCount(state)} / {(IsStageOne(state) ? RoomGate : rooms)}");
+            if (includeNote)
+            {
+                string note = HudNote(state);
+                if (!string.IsNullOrEmpty(note)) lines.Add(note);
+            }
+
             return string.Join("\n", lines);
         }
 

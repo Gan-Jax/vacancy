@@ -92,6 +92,7 @@ namespace Vacancy
         public readonly List<Guest> ActiveGuests = new List<Guest>();
         public bool VacancyOpen = true;
         public bool Paused;
+        public bool PauseMenuOpen;
         public bool BobHired;
         public bool MaryHired;
         public InventoryState Inventory;

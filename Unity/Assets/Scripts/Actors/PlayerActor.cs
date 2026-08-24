@@ -38,8 +38,9 @@ namespace Vacancy
         {
             if (input.LookEnabled)
             {
-                Yaw += input.LookX * WorldScale.LookSensitivity;
-                Pitch = Geometry.Clamp(Pitch - input.LookY * WorldScale.LookSensitivity, -80f, 80f);
+                float lookY = PlayerSettings.InvertY ? -input.LookY : input.LookY;
+                Yaw += input.LookX * PlayerSettings.LookSensitivity;
+                Pitch = Geometry.Clamp(Pitch - lookY * PlayerSettings.LookSensitivity, -80f, 80f);
             }
 
             if (ActiveTask != null)

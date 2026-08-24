@@ -60,16 +60,15 @@ namespace Vacancy
 
             if (input.EscapePressed)
             {
-                if (state.PcOpen) ClosePc();
+                if (state.PauseMenuOpen)
+                {
+                    if (!hud.HandlePauseEscape()) ResumeFromMenu();
+                }
+                else if (state.PcOpen) ClosePc();
                 else if (state.MediaOpen == "radio") CloseRadio();
                 else if (state.MediaOpen == "paper") ClosePaper();
                 else if (state.DeskGuest != null) CloseDeskReview();
-            }
-
-            if (input.PausePressed && !AnyModalOpen())
-            {
-                state.Paused = !state.Paused;
-                state.AddLog(state.Paused ? "Game paused." : "Game resumed.");
+                else OpenPauseMenu();
             }
 
             if (input.VacancyPressed && !AnyModalOpen()) ToggleVacancy();
@@ -123,6 +122,7 @@ namespace Vacancy
 
         void OnDestroy()
         {
+            Time.timeScale = 1f;
             Cursor.lockState = CursorLockMode.None;
             Cursor.visible = true;
         }
@@ -241,6 +241,33 @@ namespace Vacancy
             }
         }
 
+        public void OpenPauseMenu()
+        {
+            if (state.PauseMenuOpen || AnyModalOpen() || bannerOpen) return;
+            state.PauseMenuOpen = true;
+            state.Paused = true;
+            Time.timeScale = 0f;
+            hud.ShowPauseMenu();
+        }
+
+        public void ResumeFromMenu()
+        {
+            state.PauseMenuOpen = false;
+            Time.timeScale = 1f;
+            if (!AnyModalOpen()) state.Paused = false;
+            hud.HidePauseMenu();
+        }
+
+        public void QuitGame()
+        {
+            Time.timeScale = 1f;
+#if UNITY_EDITOR
+            UnityEditor.EditorApplication.isPlaying = false;
+#else
+            Application.Quit();
+#endif
+        }
+
         public void AddDebugCash()
         {
             state.Money += 500;
@@ -251,7 +278,9 @@ namespace Vacancy
         {
             int startDay = state.Day;
             bool wasPaused = state.Paused;
+            float scale = Time.timeScale;
             state.Paused = false;
+            Time.timeScale = 1f;
             var staff = StaffList();
             for (int i = 0; i < 4000 && state.Day == startDay; i++)
             {
@@ -259,6 +288,7 @@ namespace Vacancy
             }
 
             state.Paused = wasPaused;
+            Time.timeScale = scale;
         }
 
         public void ToggleVacancy()
@@ -307,7 +337,7 @@ namespace Vacancy
         public void ClosePc()
         {
             state.PcOpen = false;
-            if (state.DeskGuest == null && string.IsNullOrEmpty(state.MediaOpen)) state.Paused = false;
+            if (!state.PauseMenuOpen && state.DeskGuest == null && string.IsNullOrEmpty(state.MediaOpen)) state.Paused = false;
         }
 
         public void PlacePcOrder(Dictionary<string, int> quantities)
@@ -325,7 +355,7 @@ namespace Vacancy
         public void CloseRadio()
         {
             state.MediaOpen = null;
-            if (!state.PcOpen && state.DeskGuest == null) state.Paused = false;
+            if (!state.PauseMenuOpen && !state.PcOpen && state.DeskGuest == null) state.Paused = false;
             hud.HideRadio();
         }
 
@@ -346,7 +376,7 @@ namespace Vacancy
         public void ClosePaper()
         {
             state.MediaOpen = null;
-            if (!state.PcOpen && state.DeskGuest == null) state.Paused = false;
+            if (!state.PauseMenuOpen && !state.PcOpen && state.DeskGuest == null) state.Paused = false;
             hud.HidePaper();
         }
 
@@ -360,7 +390,7 @@ namespace Vacancy
         public void CloseDeskReview()
         {
             state.DeskGuest = null;
-            if (!state.PcOpen && string.IsNullOrEmpty(state.MediaOpen)) state.Paused = false;
+            if (!state.PauseMenuOpen && !state.PcOpen && string.IsNullOrEmpty(state.MediaOpen)) state.Paused = false;
         }
 
         public void AdmitDeskGuest()

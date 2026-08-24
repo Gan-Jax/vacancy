@@ -58,6 +58,16 @@ namespace Vacancy
         readonly Text bannerTitle;
         readonly Text bannerBody;
 
+        readonly GameObject pauseOverlay;
+        readonly GameObject pauseRootPage;
+        readonly GameObject pauseJournalPage;
+        readonly GameObject pauseSettingsPage;
+        readonly GameObject pauseQuitPage;
+        readonly Text pauseJournalBody;
+        readonly Text pauseSensitivity;
+        readonly Text pauseInvert;
+        string pausePage = "root";
+
         public HudView(GameState state, VacancyGame game, Transform parent)
         {
             this.state = state;
@@ -69,6 +79,7 @@ namespace Vacancy
             canvasGo.transform.SetParent(parent, false);
             var canvas = canvasGo.GetComponent<Canvas>();
             canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+            canvas.sortingOrder = 50;
             var scaler = canvasGo.GetComponent<CanvasScaler>();
             scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
             scaler.referenceResolution = new Vector2(1600, 900);
@@ -194,6 +205,70 @@ namespace Vacancy
             ButtonOn(bannerPanel.transform, "Continue", new Vector2(0, -100), () => game.DismissBanner(), 160, 34);
             bannerPanel.SetActive(false);
 
+            pauseOverlay = new GameObject("PauseOverlay", typeof(RectTransform), typeof(Image));
+            pauseOverlay.transform.SetParent(canvasGo.transform, false);
+            Stretch(pauseOverlay.GetComponent<RectTransform>(), 0, 0, 0, 0);
+            pauseOverlay.GetComponent<Image>().color = new Color(0.05f, 0.06f, 0.09f, 0.72f);
+
+            var pausePanel = Panel("PauseMenu", pauseOverlay.transform, new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(460, 500));
+            MakeText(pausePanel.transform, "Paused", new Vector2(0, 214), 28, Palette.Accent, 400).alignment = TextAnchor.MiddleCenter;
+
+            pauseRootPage = new GameObject("Root", typeof(RectTransform));
+            pauseRootPage.transform.SetParent(pausePanel.transform, false);
+            Stretch(pauseRootPage.GetComponent<RectTransform>(), 20, 20, 20, 70);
+            ButtonOn(pauseRootPage.transform, "Resume", new Vector2(0, 110), () => game.ResumeFromMenu(), 280, 40);
+            ButtonOn(pauseRootPage.transform, "Journal", new Vector2(0, 54), () => ShowPausePage("journal"), 280, 40);
+            ButtonOn(pauseRootPage.transform, "Settings", new Vector2(0, -2), () => ShowPausePage("settings"), 280, 40);
+            ButtonOn(pauseRootPage.transform, "Quit game", new Vector2(0, -58), () => ShowPausePage("quit"), 280, 40);
+            MakeText(pauseRootPage.transform, "Esc resumes · hold RMB to look", new Vector2(0, -130), 13, Palette.Muted, 380).alignment = TextAnchor.MiddleCenter;
+
+            pauseJournalPage = new GameObject("Journal", typeof(RectTransform));
+            pauseJournalPage.transform.SetParent(pausePanel.transform, false);
+            Stretch(pauseJournalPage.GetComponent<RectTransform>(), 20, 20, 20, 70);
+            MakeText(pauseJournalPage.transform, "Journal", new Vector2(0, 150), 20, Palette.Text, 380).alignment = TextAnchor.MiddleCenter;
+            pauseJournalBody = MakeText(pauseJournalPage.transform, "", new Vector2(0, 10), 15, Palette.Text, 380);
+            pauseJournalBody.alignment = TextAnchor.UpperLeft;
+            pauseJournalBody.rectTransform.sizeDelta = new Vector2(380, 260);
+            pauseJournalBody.verticalOverflow = VerticalWrapMode.Overflow;
+            ButtonOn(pauseJournalPage.transform, "Back", new Vector2(0, -180), () => ShowPausePage("root"), 200, 36);
+
+            pauseSettingsPage = new GameObject("Settings", typeof(RectTransform));
+            pauseSettingsPage.transform.SetParent(pausePanel.transform, false);
+            Stretch(pauseSettingsPage.GetComponent<RectTransform>(), 20, 20, 20, 70);
+            MakeText(pauseSettingsPage.transform, "Settings", new Vector2(0, 150), 20, Palette.Text, 380).alignment = TextAnchor.MiddleCenter;
+            MakeText(pauseSettingsPage.transform, "Look sensitivity", new Vector2(0, 86), 14, Palette.Muted, 380).alignment = TextAnchor.MiddleCenter;
+            ButtonOn(pauseSettingsPage.transform, "−", new Vector2(-90, 44), () =>
+            {
+                PlayerSettings.NudgeLookSensitivity(-PlayerSettings.LookSensitivityStep);
+                RefreshPauseSettings();
+            }, 44, 36);
+            pauseSensitivity = MakeText(pauseSettingsPage.transform, PlayerSettings.LookSensitivityLabel(), new Vector2(0, 44), 20, Palette.Text, 80);
+            pauseSensitivity.alignment = TextAnchor.MiddleCenter;
+            ButtonOn(pauseSettingsPage.transform, "+", new Vector2(90, 44), () =>
+            {
+                PlayerSettings.NudgeLookSensitivity(PlayerSettings.LookSensitivityStep);
+                RefreshPauseSettings();
+            }, 44, 36);
+            pauseInvert = MakeText(pauseSettingsPage.transform, "", new Vector2(0, -20), 14, Palette.Text, 380);
+            pauseInvert.alignment = TextAnchor.MiddleCenter;
+            ButtonOn(pauseSettingsPage.transform, "Invert look Y", new Vector2(0, -64), () =>
+            {
+                PlayerSettings.InvertY = !PlayerSettings.InvertY;
+                RefreshPauseSettings();
+            }, 220, 36);
+            ButtonOn(pauseSettingsPage.transform, "Back", new Vector2(0, -180), () => ShowPausePage("root"), 200, 36);
+
+            pauseQuitPage = new GameObject("Quit", typeof(RectTransform));
+            pauseQuitPage.transform.SetParent(pausePanel.transform, false);
+            Stretch(pauseQuitPage.GetComponent<RectTransform>(), 20, 20, 20, 70);
+            MakeText(pauseQuitPage.transform, "Leave the inn?", new Vector2(0, 80), 20, Palette.Text, 380).alignment = TextAnchor.MiddleCenter;
+            MakeText(pauseQuitPage.transform, "Unsaved progress is lost.", new Vector2(0, 36), 14, Palette.Muted, 380).alignment = TextAnchor.MiddleCenter;
+            ButtonOn(pauseQuitPage.transform, "Quit game", new Vector2(0, -30), () => game.QuitGame(), 220, 40);
+            ButtonOn(pauseQuitPage.transform, "Cancel", new Vector2(0, -86), () => ShowPausePage("root"), 200, 36);
+
+            pauseOverlay.SetActive(false);
+            RefreshPauseSettings();
+
             Refresh(true);
         }
 
@@ -276,6 +351,63 @@ namespace Vacancy
 
             radioPanel.SetActive(state.MediaOpen == "radio");
             paperPanel.SetActive(state.MediaOpen == "paper");
+
+            if (state.PauseMenuOpen)
+            {
+                pauseJournalBody.text = Stage.JournalBody(state);
+                pauseOverlay.SetActive(true);
+            }
+            else
+            {
+                pauseOverlay.SetActive(false);
+                pausePage = "root";
+            }
+        }
+
+        public void ShowPauseMenu()
+        {
+            ShowPausePage("root");
+            pauseJournalBody.text = Stage.JournalBody(state);
+            pauseOverlay.SetActive(true);
+        }
+
+        public void HidePauseMenu()
+        {
+            pauseOverlay.SetActive(false);
+            pausePage = "root";
+        }
+
+        public bool HandlePauseEscape()
+        {
+            if (pausePage != "root")
+            {
+                ShowPausePage("root");
+                return true;
+            }
+
+            return false;
+        }
+
+        void ShowPausePage(string page)
+        {
+            pausePage = page;
+            pauseRootPage.SetActive(page == "root");
+            pauseJournalPage.SetActive(page == "journal");
+            pauseSettingsPage.SetActive(page == "settings");
+            pauseQuitPage.SetActive(page == "quit");
+            if (page == "journal") pauseJournalBody.text = Stage.JournalBody(state);
+            if (page == "settings") RefreshPauseSettings();
+        }
+
+        void RefreshPauseSettings()
+        {
+            if (pauseSensitivity != null) pauseSensitivity.text = PlayerSettings.LookSensitivityLabel();
+            if (pauseInvert != null)
+            {
+                pauseInvert.text = PlayerSettings.InvertY
+                    ? "Vertical look: inverted"
+                    : "Vertical look: normal";
+            }
         }
 
         public void ShowBanner(StoryBanner banner)
