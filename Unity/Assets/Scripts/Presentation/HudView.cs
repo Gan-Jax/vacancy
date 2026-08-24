@@ -142,12 +142,11 @@ namespace Vacancy
             deskWhy.rectTransform.sizeDelta = new Vector2(580, 64);
             MakeText(deskPanel.transform, "What they said", new Vector2(0, 68), 13, Palette.Accent, 580);
             deskReplyBox = MakeScrollBox(deskPanel.transform, new Vector2(0, -10), new Vector2(580, 120));
-            deskQuestionsRoot = new GameObject("Questions", typeof(RectTransform)).transform;
+            deskQuestionsRoot = new GameObject("Questions", typeof(RectTransform)).GetComponent<RectTransform>();
             deskQuestionsRoot.SetParent(deskPanel.transform, false);
-            var qRt = deskQuestionsRoot.GetComponent<RectTransform>();
-            qRt.anchorMin = qRt.anchorMax = new Vector2(0.5f, 0.5f);
-            qRt.anchoredPosition = new Vector2(0, -148);
-            qRt.sizeDelta = new Vector2(580, 120);
+            deskQuestionsRoot.anchorMin = deskQuestionsRoot.anchorMax = new Vector2(0.5f, 0.5f);
+            deskQuestionsRoot.anchoredPosition = new Vector2(0, -148);
+            deskQuestionsRoot.sizeDelta = new Vector2(580, 120);
             deskAskHint = MakeText(deskPanel.transform, "", new Vector2(0, -228), 13, Palette.Muted, 580);
             deskAskHint.alignment = TextAnchor.MiddleCenter;
             deskAdmit = ButtonOn(deskPanel.transform, "Admit", new Vector2(-160, -278), () => game.AdmitDeskGuest(), 150, 34);
