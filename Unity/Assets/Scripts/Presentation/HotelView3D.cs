@@ -148,8 +148,10 @@ namespace Vacancy
             // filled the stair well with a solid slab, so the steps vanished.
             SlabWithHole("Lot", lotRect, layout.Building, 0.02f, 0.04f, Palette.FloorColor(8), false);
             var well = Pad(layout.Stairs, 4f);
+            var officeAndStairs = Union(layout.Office?.Rect ?? default, layout.Stairs);
+            if (officeAndStairs.W > 0f) well = Union(well, officeAndStairs);
             SlabWithHole("BuildingFloor", layout.Building, well, 0.03f, 0.06f, Palette.Corridor);
-            SlabWithHole("Ceiling", layout.Building, well, WorldScale.CeilingY, 0.08f, Palette.Hex("#1a2030"));
+            SlabWithHole("Ceiling", layout.Building, Pad(layout.Stairs, 4f), WorldScale.CeilingY, 0.08f, Palette.Hex("#1a2030"));
             if (layout.Basement.W > 0)
             {
                 SlabWithHole(
@@ -176,7 +178,7 @@ namespace Vacancy
                     SlabWithHole(
                         area.Id + "-floor",
                         Inset(area.Rect, layout.Tile),
-                        Pad(layout.Stairs, 2f),
+                        Union(layout.Office?.Rect ?? default, Pad(layout.Stairs, 2f)),
                         0.05f,
                         0.08f,
                         Palette.LobbyFloor);
@@ -184,7 +186,7 @@ namespace Vacancy
                 }
                 else if (area.Kind == AreaKind.Office)
                 {
-                    Box(area.Id + "-floor", Inset(area.Rect, layout.Tile), 0.05f, 0.08f, Palette.OfficeFloor);
+                    Box(area.Id + "-floor", Inset(area.Rect, layout.Tile), 0.08f, 0.06f, Palette.OfficeFloor);
                     Walls(area.Id, area.Rect, area.Doors, Palette.OfficeWall);
                 }
                 else if (area.Kind == AreaKind.Stairs)
@@ -829,6 +831,17 @@ namespace Vacancy
             var list = new List<Door>();
             if (door != null) list.Add(door);
             return list;
+        }
+
+        static Rect Union(Rect a, Rect b)
+        {
+            if (a.W <= 0f || a.H <= 0f) return b;
+            if (b.W <= 0f || b.H <= 0f) return a;
+            float x0 = Mathf.Min(a.X, b.X);
+            float y0 = Mathf.Min(a.Y, b.Y);
+            float x1 = Mathf.Max(a.X + a.W, b.X + b.W);
+            float y1 = Mathf.Max(a.Y + a.H, b.Y + b.H);
+            return new Rect(x0, y0, x1 - x0, y1 - y0);
         }
 
         static Rect Inset(Rect rect, float tile)
