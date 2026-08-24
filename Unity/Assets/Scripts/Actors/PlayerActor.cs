@@ -8,6 +8,27 @@ namespace Vacancy
         public Room Room;
         public float Progress;
         public float Duration;
+
+        public float Normalized
+        {
+            get
+            {
+                if (Duration <= 0f) return 1f;
+                float t = Progress / Duration;
+                if (t < 0f) return 0f;
+                if (t > 1f) return 1f;
+                return t;
+            }
+        }
+
+        public void ApplyRoomProgress()
+        {
+            if (Room == null) return;
+            float t = Normalized;
+            if (Type == "inspect") Room.InspectProgress = t;
+            else if (Type == "clean") Room.CleanProgress = t;
+            else if (Type == "repair") Room.RepairProgress = t;
+        }
     }
 
     public sealed class InteractTarget
@@ -48,6 +69,7 @@ namespace Vacancy
             if (ActiveTask != null)
             {
                 ActiveTask.Progress += GameConfig.HoursPerSecond * dt;
+                ActiveTask.ApplyRoomProgress();
                 if (ActiveTask.Progress >= ActiveTask.Duration)
                 {
                     var done = ActiveTask;
@@ -124,6 +146,7 @@ namespace Vacancy
                 Duration = GameConfig.GetTaskHours(type, room, false)
             };
             room.Worker = "player";
+            ActiveTask.ApplyRoomProgress();
         }
 
         public bool CanInteractWith(string kind, Room room, HotelLayout layout, List<StaffNpc> staffList)

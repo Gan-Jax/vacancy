@@ -11,6 +11,7 @@ namespace Vacancy
         readonly Camera playerCamera;
         readonly Dictionary<Color, Material> materials = new Dictionary<Color, Material>();
         readonly Dictionary<int, Renderer> roomFloors = new Dictionary<int, Renderer>();
+        readonly List<SwingingRoomDoor> roomDoors = new List<SwingingRoomDoor>();
         Renderer vacancySign;
         readonly List<CharacterView> characters = new List<CharacterView>();
         readonly List<CarView> carViews = new List<CarView>();
@@ -165,6 +166,7 @@ namespace Vacancy
 
             for (int i = carUsed; i < carViews.Count; i++) carViews[i].Root.gameObject.SetActive(false);
 
+            TickRoomDoors(state, player, staff);
             if (hint != null) hint.text = HintText(state, staff);
         }
 
@@ -193,7 +195,7 @@ namespace Vacancy
             }
         }
 
-        public void SetInteractHover(InteractHover marker)
+        public void SetInteractHover(InteractHover marker, GameState state = null)
         {
             if (hoverScreen == null) return;
             if (marker == null)
@@ -202,7 +204,7 @@ namespace Vacancy
                 return;
             }
 
-            hoverScreen.text = marker.Caption();
+            hoverScreen.text = marker.Caption(state);
             hoverScreen.gameObject.SetActive(true);
         }
 
@@ -214,22 +216,6 @@ namespace Vacancy
             marker.RoomId = roomId;
             var bounds = renderer.bounds;
             marker.Anchor = anchor ?? new Vector3(bounds.center.x, bounds.max.y + 0.32f, bounds.center.z);
-        }
-
-        void TryMarkRoomPart(string name, Renderer renderer)
-        {
-            if (renderer == null || string.IsNullOrEmpty(name) || !name.StartsWith("Room-")) return;
-            string rest = name.Substring(5);
-            int digits = 0;
-            while (digits < rest.Length && char.IsDigit(rest[digits])) digits++;
-            if (digits == 0 || !int.TryParse(rest.Substring(0, digits), out int roomId) || roomId < 1)
-            {
-                return;
-            }
-
-            if (layout.RoomCenters == null || roomId > layout.RoomCenters.Count) return;
-            var center = layout.RoomCenters[roomId - 1];
-            MarkInteract(renderer, "room", roomId, WorldScale.ToWorld(center.X, center.Y, 1.55f));
         }
 
         void FaceCamera(Transform target)
@@ -334,21 +320,16 @@ namespace Vacancy
             foreach (var planned in layout.Floor.Rooms)
             {
                 var inner = Inset(planned.Rect, layout.Tile);
-                var roomAnchor = WorldScale.ToWorld(planned.Center.X, planned.Center.Y, 1.55f);
                 roomFloors[planned.Id] = Box($"RoomFloor-{planned.Id}", inner, 0.05f, 0.08f, Palette.Locked);
-                MarkInteract(roomFloors[planned.Id], "room", planned.Id, roomAnchor);
                 Walls($"Room-{planned.Id}", planned.Rect, DoorList(planned.DoorOpening), Palette.Wall);
                 RoomWindow(planned);
-                MarkInteract(
-                    Box(
-                        $"Bed-{planned.Id}",
-                        new Rect(inner.X + inner.W * 0.2f, inner.Y + inner.H * 0.25f, inner.W * 0.55f, inner.H * 0.4f),
-                        0.28f,
-                        0.4f,
-                        Palette.Hex("#3a455c")),
-                    "room",
-                    planned.Id,
-                    roomAnchor);
+                HangGuestDoor(planned);
+                Box(
+                    $"Bed-{planned.Id}",
+                    new Rect(inner.X + inner.W * 0.2f, inner.Y + inner.H * 0.25f, inner.W * 0.55f, inner.H * 0.4f),
+                    0.28f,
+                    0.4f,
+                    Palette.Hex("#3a455c"));
                 Box($"RoomRoof-{planned.Id}", planned.Rect, WorldScale.CeilingY, 0.08f, Palette.Hex("#1a2030"));
             }
 
@@ -725,7 +706,7 @@ namespace Vacancy
             rt.anchorMin = rt.anchorMax = new Vector2(0.5f, 0.5f);
             rt.pivot = new Vector2(0.5f, 1f);
             rt.anchoredPosition = new Vector2(0f, -14f);
-            rt.sizeDelta = new Vector2(520f, 28f);
+            rt.sizeDelta = new Vector2(640f, 28f);
             var text = go.GetComponent<Text>();
             text.font = font;
             text.fontSize = 18;
@@ -1227,7 +1208,7 @@ namespace Vacancy
             else if (side == "west") wallRect = new Rect(rect.X, from, thick, len);
             else wallRect = new Rect(rect.X + rect.W - thick, from, thick, len);
 
-            TryMarkRoomPart(name, Box(name, wallRect, yBottom + WorldScale.WallHeight * 0.5f, WorldScale.WallHeight, color));
+            Box(name, wallRect, yBottom + WorldScale.WallHeight * 0.5f, WorldScale.WallHeight, color);
         }
 
         void FrameOpening(string name, Door door, string side, Rect rect, Color color, float yBottom)
@@ -1243,15 +1224,212 @@ namespace Vacancy
             else opening = new Rect(rect.X + rect.W - thick, gap0, thick, door.Width);
 
             float lintelH = 0.55f;
-            TryMarkRoomPart(
-                name,
+            Box(
+                name + "-lintel",
+                opening,
+                yBottom + WorldScale.WallHeight - lintelH * 0.5f,
+                lintelH,
+                color);
+            Box(name + "-sill", opening, yBottom + 0.055f, 0.05f, Palette.Doorway);
+        }
+
+        void HangGuestDoor(PlannedRoom planned)
+        {
+            var door = planned?.DoorOpening;
+            if (door == null) return;
+            bool east = door.Side == "east";
+            bool south = door.Side == "south";
+            if (!east && !south) return;
+
+            FrameGuestJambs(planned, door);
+
+            float thick = 5f;
+            float leaf = door.Width * 0.9f;
+            float hingeInset = 2f;
+            float wallMid = layout.Tile * 0.5f;
+            float hingeX;
+            float hingeY;
+            float closedYaw;
+            if (east)
+            {
+                hingeX = door.Center.X - wallMid;
+                hingeY = door.Center.Y + door.Width / 2f - hingeInset;
+                closedYaw = 180f;
+            }
+            else
+            {
+                hingeX = door.Center.X - door.Width / 2f + hingeInset;
+                hingeY = door.Center.Y - wallMid;
+                closedYaw = 90f;
+            }
+
+            var pivot = new GameObject($"RoomDoor-{planned.Id}").transform;
+            pivot.SetParent(root, false);
+            pivot.position = WorldScale.ToWorld(hingeX, hingeY, 0f);
+            pivot.rotation = Quaternion.Euler(0f, closedYaw, 0f);
+
+            float leafM = WorldScale.Meters(leaf);
+            float thickM = WorldScale.Meters(thick);
+            var leafGo = MeshObject(
+                $"RoomDoor-{planned.Id}-leaf",
+                pivot,
+                cubeMesh,
+                Vector3.zero,
+                Vector3.one,
+                Palette.Hex("#5a4030"));
+            leafGo.transform.localPosition = new Vector3(0f, 1.15f, leafM * 0.5f);
+            leafGo.transform.localRotation = Quaternion.identity;
+            leafGo.transform.localScale = new Vector3(thickM, 2.2f, leafM);
+            SetTrigger(leafGo);
+
+            var knobGo = MeshObject(
+                $"RoomDoor-{planned.Id}-knob",
+                pivot,
+                cubeMesh,
+                Vector3.zero,
+                Vector3.one,
+                Palette.Hex("#c4a574"));
+            knobGo.transform.localPosition = new Vector3(0f, 1.05f, leafM * 0.82f);
+            knobGo.transform.localRotation = Quaternion.identity;
+            knobGo.transform.localScale = new Vector3(thickM + WorldScale.Meters(4f), 0.08f, WorldScale.Meters(4f));
+            SetTrigger(knobGo);
+
+            var marker = pivot.gameObject.AddComponent<InteractHover>();
+            marker.Kind = "room";
+            marker.RoomId = planned.Id;
+            marker.Anchor = WorldScale.ToWorld(door.Center.X, door.Center.Y, 1.55f);
+
+            roomDoors.Add(new SwingingRoomDoor
+            {
+                RoomId = planned.Id,
+                Pivot = pivot,
+                ClosedYaw = closedYaw,
+                OpenYaw = closedYaw + 90f,
+                Angle = closedYaw,
+                DoorX = door.Center.X,
+                DoorY = door.Center.Y,
+                Side = door.Side,
+                Width = door.Width
+            });
+        }
+
+        void FrameGuestJambs(PlannedRoom planned, Door door)
+        {
+            float thick = layout.Tile;
+            float jamb = 4f;
+            float lintelH = 0.55f;
+            float height = WorldScale.WallHeight - lintelH - 0.08f;
+            float yCenter = 0.08f + height * 0.5f;
+            if (door.Side == "east")
+            {
+                float x = planned.Rect.X + planned.Rect.W - thick;
                 Box(
-                    name + "-lintel",
-                    opening,
-                    yBottom + WorldScale.WallHeight - lintelH * 0.5f,
-                    lintelH,
-                    color));
-            TryMarkRoomPart(name, Box(name + "-sill", opening, yBottom + 0.055f, 0.05f, Palette.Doorway));
+                    $"RoomDoor-{planned.Id}-jambN",
+                    new Rect(x, door.Center.Y - door.Width / 2f, thick, jamb),
+                    yCenter,
+                    height,
+                    Palette.Doorway);
+                Box(
+                    $"RoomDoor-{planned.Id}-jambS",
+                    new Rect(x, door.Center.Y + door.Width / 2f - jamb, thick, jamb),
+                    yCenter,
+                    height,
+                    Palette.Doorway);
+            }
+            else if (door.Side == "south")
+            {
+                float y = planned.Rect.Y + planned.Rect.H - thick;
+                Box(
+                    $"RoomDoor-{planned.Id}-jambW",
+                    new Rect(door.Center.X - door.Width / 2f, y, jamb, thick),
+                    yCenter,
+                    height,
+                    Palette.Doorway);
+                Box(
+                    $"RoomDoor-{planned.Id}-jambE",
+                    new Rect(door.Center.X + door.Width / 2f - jamb, y, jamb, thick),
+                    yCenter,
+                    height,
+                    Palette.Doorway);
+            }
+        }
+
+        static void SetTrigger(GameObject go)
+        {
+            var col = go.GetComponent<Collider>();
+            if (col != null) col.isTrigger = true;
+        }
+
+        void TickRoomDoors(GameState state, PlayerActor player, List<StaffNpc> staff)
+        {
+            float dt = Time.deltaTime;
+            foreach (var swinging in roomDoors)
+            {
+                swinging.Tick(dt, DoorHasTraffic(swinging, state, player, staff));
+            }
+        }
+
+        bool DoorHasTraffic(SwingingRoomDoor swinging, GameState state, PlayerActor player, List<StaffNpc> staff)
+        {
+            if (state?.Rooms == null) return false;
+            Room room = null;
+            foreach (var candidate in state.Rooms)
+            {
+                if (candidate.Id == swinging.RoomId)
+                {
+                    room = candidate;
+                    break;
+                }
+            }
+
+            if (room == null || !room.Unlocked) return false;
+
+            if (player != null && player.FloorLevel == 0 && InDoorway(swinging, player.X, player.Y))
+            {
+                return true;
+            }
+
+            if (state.ActiveGuests != null)
+            {
+                foreach (var guest in state.ActiveGuests)
+                {
+                    if (guest == null || guest.FloorLevel != 0 || guest.RoomId != swinging.RoomId) continue;
+                    if (InDoorway(swinging, guest.X, guest.Y)) return true;
+                }
+            }
+
+            if (staff != null)
+            {
+                foreach (var person in staff)
+                {
+                    if (person == null || person.FloorLevel != 0) continue;
+                    int targetId = person.TargetRoom != null ? person.TargetRoom.Id : 0;
+                    int exitId = person.ExitRoomId ?? 0;
+                    if (targetId != swinging.RoomId && exitId != swinging.RoomId) continue;
+                    if (InDoorway(swinging, person.X, person.Y)) return true;
+                }
+            }
+
+            return false;
+        }
+
+        static bool InDoorway(SwingingRoomDoor swinging, float x, float y)
+        {
+            float along;
+            float normal;
+            if (swinging.Side == "east")
+            {
+                along = y - swinging.DoorY;
+                normal = x - swinging.DoorX;
+            }
+            else
+            {
+                along = x - swinging.DoorX;
+                normal = y - swinging.DoorY;
+            }
+
+            float half = swinging.Width * 0.5f + 4f;
+            return Mathf.Abs(along) <= half && Mathf.Abs(normal) <= 22f;
         }
 
         void HangOfficeDoor(FloorArea office)
@@ -1571,6 +1749,35 @@ namespace Vacancy
             mesh.SetNormals(norms);
             mesh.SetTriangles(tris, 0);
             return mesh;
+        }
+
+        sealed class SwingingRoomDoor
+        {
+            public int RoomId;
+            public Transform Pivot;
+            public float ClosedYaw;
+            public float OpenYaw;
+            public float Angle;
+            public float CloseTimer;
+            public float DoorX;
+            public float DoorY;
+            public string Side;
+            public float Width;
+
+            const float OpenSpeed = 720f;
+            const float CloseSpeed = 240f;
+            const float HoldSeconds = 1.15f;
+
+            public void Tick(float dt, bool traffic)
+            {
+                if (traffic) CloseTimer = HoldSeconds;
+                else CloseTimer = Mathf.Max(0f, CloseTimer - dt);
+
+                float target = CloseTimer > 0f ? OpenYaw : ClosedYaw;
+                float speed = CloseTimer > 0f ? OpenSpeed : CloseSpeed;
+                Angle = Mathf.MoveTowardsAngle(Angle, target, speed * dt);
+                if (Pivot != null) Pivot.rotation = Quaternion.Euler(0f, Angle, 0f);
+            }
         }
 
         sealed class CharacterView

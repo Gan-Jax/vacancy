@@ -84,6 +84,12 @@ namespace Vacancy
         readonly Text pauseInvert;
         string pausePage = "root";
 
+        GameObject holdRoot;
+        Image holdFill;
+        Text holdAction;
+        Text holdPercent;
+        RectTransform holdHead;
+
         public HudView(GameState state, VacancyGame game, Transform parent)
         {
             this.state = state;
@@ -303,6 +309,8 @@ namespace Vacancy
             ButtonOn(bannerPanel.transform, "Continue", new Vector2(0, -100), () => game.DismissBanner(), 160, 34);
             bannerPanel.SetActive(false);
 
+            BuildHoldProgress(canvasGo.transform);
+
             pauseOverlay = new GameObject("PauseOverlay", typeof(RectTransform), typeof(Image));
             pauseOverlay.transform.SetParent(canvasGo.transform, false);
             Stretch(pauseOverlay.GetComponent<RectTransform>(), 0, 0, 0, 0);
@@ -368,6 +376,31 @@ namespace Vacancy
             RefreshPauseSettings();
 
             Refresh(true);
+        }
+
+        public void SetHoldProgress(string actionType, float normalized)
+        {
+            if (holdRoot == null) return;
+
+            bool blocked = state.PauseMenuOpen
+                || state.PcOpen
+                || state.DeskGuest != null
+                || !string.IsNullOrEmpty(state.MediaOpen)
+                || bannerPanel.activeSelf;
+
+            if (blocked || string.IsNullOrEmpty(actionType))
+            {
+                holdRoot.SetActive(false);
+                return;
+            }
+
+            float t = Mathf.Clamp01(normalized);
+            holdFill.fillAmount = t;
+            holdFill.color = HoldFillColor(actionType);
+            if (holdHead != null) holdHead.localEulerAngles = new Vector3(0f, 0f, -t * 360f);
+            if (holdAction != null) holdAction.text = HoldActionLabel(actionType);
+            if (holdPercent != null) holdPercent.text = Mathf.RoundToInt(t * 100f) + "%";
+            holdRoot.SetActive(true);
         }
 
         public bool PointerOverHud()
@@ -881,6 +914,134 @@ namespace Vacancy
             }
 
             return quantities;
+        }
+
+        void BuildHoldProgress(Transform canvas)
+        {
+            var disc = MakeDiscSprite(128);
+            var pixel = MakeWhitePixel();
+
+            holdRoot = new GameObject("HoldProgress", typeof(RectTransform));
+            holdRoot.transform.SetParent(canvas, false);
+            var rootRt = holdRoot.GetComponent<RectTransform>();
+            rootRt.anchorMin = rootRt.anchorMax = new Vector2(0.5f, 0.5f);
+            rootRt.pivot = new Vector2(0.5f, 0.5f);
+            rootRt.anchoredPosition = Vector2.zero;
+            rootRt.sizeDelta = new Vector2(148f, 148f);
+
+            const float outer = 136f;
+            const float hole = 92f;
+            const float rim = (outer + hole) * 0.25f;
+
+            MakeUiImage("Track", holdRoot.transform, disc, new Color(0.07f, 0.08f, 0.11f, 0.94f), outer);
+
+            holdFill = MakeUiImage("Fill", holdRoot.transform, disc, Palette.Text, outer);
+            holdFill.type = Image.Type.Filled;
+            holdFill.fillMethod = Image.FillMethod.Radial360;
+            holdFill.fillOrigin = (int)Image.Origin360.Top;
+            holdFill.fillClockwise = true;
+            holdFill.fillAmount = 0f;
+
+            MakeUiImage("Well", holdRoot.transform, disc, new Color(0.05f, 0.06f, 0.09f, 0.78f), hole);
+
+            var startTick = MakeUiImage("StartTick", holdRoot.transform, pixel, Palette.Text, 6f);
+            var startRt = startTick.rectTransform;
+            startRt.sizeDelta = new Vector2(5f, 18f);
+            startRt.anchoredPosition = new Vector2(0f, rim);
+
+            holdHead = new GameObject("HeadPivot", typeof(RectTransform)).GetComponent<RectTransform>();
+            holdHead.SetParent(holdRoot.transform, false);
+            holdHead.anchorMin = holdHead.anchorMax = new Vector2(0.5f, 0.5f);
+            holdHead.pivot = new Vector2(0.5f, 0.5f);
+            holdHead.anchoredPosition = Vector2.zero;
+            holdHead.sizeDelta = Vector2.zero;
+
+            var headTick = MakeUiImage("HeadTick", holdHead, disc, Color.white, 12f);
+            headTick.rectTransform.anchoredPosition = new Vector2(0f, rim);
+
+            holdAction = MakeText(holdRoot.transform, "Inspect", new Vector2(0f, 16f), 13, Palette.Muted, 110);
+            holdAction.alignment = TextAnchor.MiddleCenter;
+            holdAction.raycastTarget = false;
+            holdAction.rectTransform.sizeDelta = new Vector2(110f, 22f);
+
+            holdPercent = MakeText(holdRoot.transform, "0%", new Vector2(0f, -8f), 22, Palette.Text, 110);
+            holdPercent.alignment = TextAnchor.MiddleCenter;
+            holdPercent.raycastTarget = false;
+            holdPercent.rectTransform.sizeDelta = new Vector2(110f, 32f);
+            var outline = holdPercent.gameObject.AddComponent<Outline>();
+            outline.effectColor = new Color(0.04f, 0.05f, 0.07f, 0.92f);
+            outline.effectDistance = new Vector2(1.2f, -1.2f);
+
+            holdRoot.SetActive(false);
+        }
+
+        static string HoldActionLabel(string type)
+        {
+            if (type == "inspect") return "Inspect";
+            if (type == "clean") return "Clean";
+            if (type == "repair") return "Repair";
+            if (string.IsNullOrEmpty(type) || type.Length == 1) return type ?? "";
+            return char.ToUpperInvariant(type[0]) + type.Substring(1);
+        }
+
+        static Color HoldFillColor(string type)
+        {
+            if (type == "clean") return Palette.Hex("#b8f5d4");
+            if (type == "repair") return Palette.Hex("#ffc4a0");
+            if (type == "inspect") return Palette.Accent;
+            return Palette.Text;
+        }
+
+        static Image MakeUiImage(string name, Transform parent, Sprite sprite, Color color, float size)
+        {
+            var go = new GameObject(name, typeof(RectTransform), typeof(Image));
+            go.transform.SetParent(parent, false);
+            var rt = go.GetComponent<RectTransform>();
+            rt.anchorMin = rt.anchorMax = new Vector2(0.5f, 0.5f);
+            rt.pivot = new Vector2(0.5f, 0.5f);
+            rt.anchoredPosition = Vector2.zero;
+            rt.sizeDelta = new Vector2(size, size);
+            var image = go.GetComponent<Image>();
+            image.sprite = sprite;
+            image.color = color;
+            image.raycastTarget = false;
+            image.preserveAspect = true;
+            return image;
+        }
+
+        static Sprite MakeWhitePixel()
+        {
+            var tex = new Texture2D(1, 1, TextureFormat.RGBA32, false);
+            tex.SetPixel(0, 0, Color.white);
+            tex.Apply();
+            tex.filterMode = FilterMode.Point;
+            tex.wrapMode = TextureWrapMode.Clamp;
+            tex.hideFlags = HideFlags.HideAndDontSave;
+            return Sprite.Create(tex, new UnityEngine.Rect(0f, 0f, 1f, 1f), new Vector2(0.5f, 0.5f), 1f);
+        }
+
+        static Sprite MakeDiscSprite(int size)
+        {
+            var tex = new Texture2D(size, size, TextureFormat.RGBA32, false);
+            tex.filterMode = FilterMode.Bilinear;
+            tex.wrapMode = TextureWrapMode.Clamp;
+            tex.hideFlags = HideFlags.HideAndDontSave;
+            float c = size * 0.5f;
+            float r = c - 1f;
+            var pixels = new Color[size * size];
+            for (int y = 0; y < size; y++)
+            {
+                for (int x = 0; x < size; x++)
+                {
+                    float d = Vector2.Distance(new Vector2(x + 0.5f, y + 0.5f), new Vector2(c, c));
+                    float a = Mathf.Clamp01(r - d + 0.75f);
+                    pixels[y * size + x] = new Color(1f, 1f, 1f, a);
+                }
+            }
+
+            tex.SetPixels(pixels);
+            tex.Apply();
+            return Sprite.Create(tex, new UnityEngine.Rect(0, 0, size, size), new Vector2(0.5f, 0.5f), size);
         }
 
         GameObject Bar(string name, Transform parent, Vector2 anchor, Vector2 pos, Vector2 size)

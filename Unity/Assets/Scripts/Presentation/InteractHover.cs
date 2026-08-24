@@ -8,7 +8,7 @@ namespace Vacancy
         public int RoomId;
         public Vector3 Anchor;
 
-        public string Caption()
+        public string Caption(GameState state = null)
         {
             switch (Kind)
             {
@@ -19,9 +19,35 @@ namespace Vacancy
                 case "office": return "Office PC";
                 case "sign": return "Vacancy sign";
                 case "desk": return "Front desk";
-                case "room": return RoomId > 0 ? "Room " + RoomId : "Room";
+                case "room": return RoomCaption(state, RoomId);
                 default: return Kind;
             }
+        }
+
+        static string RoomCaption(GameState state, int roomId)
+        {
+            if (roomId < 1) return "Room";
+            if (state?.Rooms == null) return "Room " + roomId;
+
+            Room hovered = null;
+            Room nextLocked = null;
+            foreach (var room in state.Rooms)
+            {
+                if (room.Id == roomId) hovered = room;
+                if (!room.Unlocked && nextLocked == null) nextLocked = room;
+            }
+
+            if (hovered != null && !hovered.Unlocked)
+            {
+                if (nextLocked != null && hovered.Id != nextLocked.Id)
+                {
+                    return "Unlock Room " + nextLocked.Id + " first";
+                }
+
+                return "Unlock Room for $" + state.RoomUnlockCost();
+            }
+
+            return "Room " + roomId;
         }
     }
 }

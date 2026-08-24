@@ -129,6 +129,7 @@ namespace Vacancy
             {
                 Phase = "working";
                 ActiveTask.Progress += GameConfig.HoursPerSecond * dt;
+                ActiveTask.ApplyRoomProgress();
                 var center = layout.RoomCenters[ActiveTask.Room.Id - 1];
                 Pathing.SteerTo(this, center.X, center.Y, dt, state.Rooms, layout, allowId, speed);
 
@@ -319,6 +320,7 @@ namespace Vacancy
                         Duration = GameConfig.GetTaskHours(type, room, true)
                     };
                     room.Worker = Id;
+                    ActiveTask.ApplyRoomProgress();
                     Phase = "working";
                 }
 

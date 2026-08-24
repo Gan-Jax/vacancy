@@ -126,6 +126,7 @@ namespace Vacancy
             if (inspectMode && !AnyModalOpen() && !state.Paused) UpdateInspectPin(input.ClickPressed);
             else view?.SetInspect(false, null, null);
             hud.Refresh();
+            UpdateHoldProgress();
         }
 
         void LateUpdate()
@@ -149,6 +150,19 @@ namespace Vacancy
             return state.PcOpen || state.DeskGuest != null || !string.IsNullOrEmpty(state.MediaOpen);
         }
 
+        void UpdateHoldProgress()
+        {
+            if (hud == null) return;
+            var task = player != null ? player.ActiveTask : null;
+            if (task == null || bannerOpen)
+            {
+                hud.SetHoldProgress(null, 0f);
+                return;
+            }
+
+            hud.SetHoldProgress(task.Type, task.Normalized);
+        }
+
         void UpdateInteractHover()
         {
             if (view == null || player == null || playerCam == null || state == null)
@@ -156,7 +170,7 @@ namespace Vacancy
                 return;
             }
 
-            if (state.Paused || state.PauseMenuOpen || AnyModalOpen() || bannerOpen || inspectMode)
+            if (state.Paused || state.PauseMenuOpen || AnyModalOpen() || bannerOpen || inspectMode || player.ActiveTask != null)
             {
                 view.SetInteractHover(null);
                 return;
@@ -177,7 +191,7 @@ namespace Vacancy
                 return;
             }
 
-            view.SetInteractHover(marker);
+            view.SetInteractHover(marker, state);
         }
 
         InteractHover PickInteractHover(Ray ray)
@@ -185,8 +199,8 @@ namespace Vacancy
             InteractHover best = null;
             float bestDist = float.MaxValue;
             int bestPri = int.MaxValue;
-            ConsiderHits(Physics.RaycastAll(ray, 24f), ref best, ref bestDist, ref bestPri);
-            ConsiderHits(Physics.SphereCastAll(ray.origin, 0.18f, ray.direction, 24f), ref best, ref bestDist, ref bestPri);
+            ConsiderHits(Physics.RaycastAll(ray, 24f, ~0, QueryTriggerInteraction.Collide), ref best, ref bestDist, ref bestPri);
+            ConsiderHits(Physics.SphereCastAll(ray.origin, 0.18f, ray.direction, 24f, ~0, QueryTriggerInteraction.Collide), ref best, ref bestDist, ref bestPri);
             return best;
         }
 
@@ -224,11 +238,10 @@ namespace Vacancy
                 case "sign":
                     return 0;
                 case "office":
+                case "room":
                     return 1;
                 case "desk":
                     return 2;
-                case "room":
-                    return 3;
                 default:
                     return 4;
             }
