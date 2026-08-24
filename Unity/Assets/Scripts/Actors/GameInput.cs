@@ -13,9 +13,13 @@ namespace Vacancy
         public bool VacancyPressed;
         public bool ReinforcePressed;
         public bool EscapePressed;
+        public float LookX;
+        public float LookY;
+        public bool LookEnabled;
 
-        public void Poll()
+        public void Poll(bool lookEnabled)
         {
+            LookEnabled = lookEnabled;
             Up = Held(KeyCode.W) || Held(KeyCode.UpArrow);
             Down = Held(KeyCode.S) || Held(KeyCode.DownArrow);
             Left = Held(KeyCode.A) || Held(KeyCode.LeftArrow);
@@ -25,9 +29,33 @@ namespace Vacancy
             VacancyPressed = Pressed(KeyCode.V);
             ReinforcePressed = Pressed(KeyCode.R);
             EscapePressed = Pressed(KeyCode.Escape);
+
+            if (lookEnabled)
+            {
+                LookX = Axis("Mouse X");
+                LookY = Axis("Mouse Y");
+            }
+            else
+            {
+                LookX = 0f;
+                LookY = 0f;
+            }
         }
 
         static bool Held(KeyCode key) => Input.GetKey(key);
+
         static bool Pressed(KeyCode key) => Input.GetKeyDown(key);
+
+        static float Axis(string name)
+        {
+            try
+            {
+                return Input.GetAxisRaw(name);
+            }
+            catch (System.Exception)
+            {
+                return 0f;
+            }
+        }
     }
 }

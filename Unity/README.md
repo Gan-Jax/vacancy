@@ -1,8 +1,8 @@
 # Vacancy — Unity
 
-Same story-driven inn as the browser prototype, now running in Unity as a top-down 2D game.
+Same story-driven inn as the browser prototype, now running in Unity as a **first-person 3D** game.
 
-The hotel is **generated from data** (rooms, corridors, lobby, nav grid, A*). There is no hand-placed level yet. Press Play and the ground floor builds itself. Story, desk admit/refuse, radio/paper, and shelter ride on top of that building.
+The hotel is **generated from data** (rooms, corridors, lobby, nav grid, A*) and extruded into walkable 3D rooms. There is no hand-placed level yet. Press Play and the ground floor builds itself. Story, desk admit/refuse, radio/paper, and shelter ride on top of that building.
 
 ## Open it
 
@@ -22,11 +22,12 @@ If Unity opens in **Safe Mode** from the first import, click **Ignore** / **Exit
 
 | Key | Action |
 |-----|--------|
-| WASD / arrows | Move |
+| Mouse | Look around (cursor is locked while you walk) |
+| WASD / arrows | Walk relative to where you are looking |
 | E / Space | Desk, radio, paper, office PC, unlock, inspect → clean → repair |
 | V | Vacancy sign |
 | R | Reinforce barricades with lumber (shelter era) |
-| P | Pause |
+| P | Pause — also unlocks the mouse so you can click HUD buttons |
 | Esc | Close office PC / radio / paper / desk review |
 
 Shop buttons on the right hire Bob / Mary, unlock rooms, and flip the sign. `+$500` and `+1 day` are debug buttons.
@@ -51,7 +52,7 @@ At the desk, **E** opens the arrival review. Ask from the radio or paper, then a
 | `js/shelter.js` | `Assets/Scripts/Systems/Shelter.cs` |
 | `js/entities.js` | `Assets/Scripts/Actors/` |
 | `js/main.js` | `Assets/Scripts/VacancyGame.cs` |
-| canvas drawing | `Assets/Scripts/Presentation/HotelView.cs` |
+| canvas drawing | `Assets/Scripts/Presentation/HotelView3D.cs` (2D `HotelView.cs` kept as reference) |
 | HTML HUD | `Assets/Scripts/Presentation/HudView.cs` |
 
 Balance numbers are the same. Tweak `GameConfig.cs` the way you used to tweak `config.js`.
@@ -60,11 +61,11 @@ This is **not** Project RM. Namespace is `Vacancy`. Product name is Vacancy. The
 
 ## Look
 
-This first pass keeps the prototype look on purpose: colored rooms, circle people, Segoe UI labels, time-of-day background. That is the scaffold for real art later — sprites and furniture can replace the generated quads without touching check-in, pathing, or staff.
+This first 3D pass keeps the prototype look on purpose: extruded colored rooms, capsule people, block furniture, and a first-person camera. That is the scaffold for real art later — meshes and lights can replace the generated boxes without touching check-in, pathing, or staff.
 
 ## Next (when you are ready)
 
-- Swap generated rooms for tiles / sprites
-- Sprite characters instead of circles
+- Real furniture and character models
+- Multiple floors
 - Layout inspect (X) in Unity
 - Save / load

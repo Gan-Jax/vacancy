@@ -21,6 +21,8 @@ namespace Vacancy
         public float X { get; set; }
         public float Y { get; set; }
         public float Radius { get; set; } = 14f;
+        public float Yaw;
+        public float Pitch;
         public string Facing = "down";
         public ActiveTask ActiveTask;
         public List<Point> Path { get; set; } = new List<Point>();
@@ -34,6 +36,12 @@ namespace Vacancy
 
         public ActiveTask Update(GameInput input, float dt, HotelLayout layout, List<Room> rooms)
         {
+            if (input.LookEnabled)
+            {
+                Yaw += input.LookX * WorldScale.LookSensitivity;
+                Pitch = Geometry.Clamp(Pitch - input.LookY * WorldScale.LookSensitivity, -80f, 80f);
+            }
+
             if (ActiveTask != null)
             {
                 ActiveTask.Progress += GameConfig.HoursPerSecond * dt;
@@ -47,12 +55,35 @@ namespace Vacancy
                 return null;
             }
 
+            double yawRad = Yaw * System.Math.PI / 180.0;
+            float sin = (float)System.Math.Sin(yawRad);
+            float cos = (float)System.Math.Cos(yawRad);
+
             float dx = 0f;
             float dy = 0f;
-            if (input.Up) dy -= 1f;
-            if (input.Down) dy += 1f;
-            if (input.Left) dx -= 1f;
-            if (input.Right) dx += 1f;
+            if (input.Up)
+            {
+                dx += sin;
+                dy += cos;
+            }
+
+            if (input.Down)
+            {
+                dx -= sin;
+                dy -= cos;
+            }
+
+            if (input.Right)
+            {
+                dx += cos;
+                dy -= sin;
+            }
+
+            if (input.Left)
+            {
+                dx -= cos;
+                dy += sin;
+            }
 
             if (dx != 0 || dy != 0)
             {

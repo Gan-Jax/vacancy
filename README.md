@@ -164,8 +164,8 @@ guest-room bands, side corridors, lobby/office, and Mary's room / Bob's closet
 on the service band. Room count follows the canvas (~30 on 1360×820). Three
 rooms start unlocked.
 
-A Unity 2D port lives in [`Unity/`](Unity/README.md). Same floorplan, same
-story loop. Open that folder in Unity Hub.
+A Unity first-person 3D port lives in [`Unity/`](Unity/README.md). Same
+floorplan, same story loop. Open that folder in Unity Hub.
 
 ## Next steps
 

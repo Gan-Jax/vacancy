@@ -10,8 +10,9 @@ namespace Vacancy
         PlayerActor player;
         StaffNpc bob;
         StaffNpc mary;
-        HotelView view;
+        HotelView3D view;
         HudView hud;
+        Camera playerCam;
         readonly GameInput input = new GameInput();
         bool bannerOpen;
 
@@ -28,6 +29,7 @@ namespace Vacancy
             layout = HotelLayout.Create();
             state = GameState.Create(layout.RoomCount);
             player = new PlayerActor(layout.Spawn.X + 40, layout.Spawn.Y);
+            player.Yaw = 180f;
 
             var problems = layout.Validate();
             if (problems.Count > 0)
@@ -43,15 +45,17 @@ namespace Vacancy
                 state.AddLog($"{layout.Floor.Name}: {layout.RoomCount} rooms, every door reachable.");
             }
 
-            BuildCamera();
-            view = new HotelView(layout, transform);
+            playerCam = BuildCamera();
+            view = new HotelView3D(layout, transform, playerCam);
             hud = new HudView(state, this, transform);
         }
 
         void Update()
         {
             if (state == null) return;
-            input.Poll();
+            bool look = !state.Paused && !AnyModalOpen() && !bannerOpen;
+            input.Poll(look);
+            ApplyCursor(look);
             float dt = Mathf.Min(0.05f, Time.deltaTime);
 
             if (input.EscapePressed)
@@ -107,6 +111,19 @@ namespace Vacancy
 
             view.Refresh(state, player, StaffList());
             hud.Refresh();
+        }
+
+        void LateUpdate()
+        {
+            if (player == null || playerCam == null) return;
+            playerCam.transform.position = WorldScale.ToWorld(player.X, player.Y, WorldScale.EyeHeight);
+            playerCam.transform.rotation = Quaternion.Euler(player.Pitch, player.Yaw, 0f);
+        }
+
+        void OnDestroy()
+        {
+            Cursor.lockState = CursorLockMode.None;
+            Cursor.visible = true;
         }
 
         bool AnyModalOpen()
@@ -380,18 +397,29 @@ namespace Vacancy
             return list;
         }
 
-        void BuildCamera()
+        Camera BuildCamera()
         {
             var existing = Camera.main;
             var cam = existing != null ? existing : new GameObject("Main Camera").AddComponent<Camera>();
             cam.tag = "MainCamera";
-            cam.orthographic = true;
-            cam.orthographicSize = layout.Height * 0.52f;
-            cam.transform.position = new Vector3(layout.Width * 0.5f, -layout.Height * 0.5f, -10f);
+            cam.orthographic = false;
+            cam.fieldOfView = 72f;
+            cam.nearClipPlane = 0.08f;
+            cam.farClipPlane = 120f;
             cam.backgroundColor = Palette.HudBg;
             cam.clearFlags = CameraClearFlags.SolidColor;
-            cam.nearClipPlane = 0.1f;
-            cam.farClipPlane = 100f;
+            if (cam.GetComponent<AudioListener>() == null)
+            {
+                cam.gameObject.AddComponent<AudioListener>();
+            }
+
+            return cam;
+        }
+
+        static void ApplyCursor(bool look)
+        {
+            Cursor.lockState = look ? CursorLockMode.Locked : CursorLockMode.None;
+            Cursor.visible = !look;
         }
     }
 }
