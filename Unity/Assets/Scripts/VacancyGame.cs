@@ -170,13 +170,8 @@ namespace Vacancy
                 return;
             }
 
-            Room room = null;
-            if (marker.Kind == "room" && marker.RoomId > 0 && marker.RoomId <= state.Rooms.Count)
-            {
-                room = state.Rooms[marker.RoomId - 1];
-            }
-
-            if (!player.CanInteractWith(marker.Kind, room, layout, StaffList()))
+            WorldScale.FromWorld(marker.Anchor, out float hx, out float hy);
+            if (Geometry.Dist(player.X, player.Y, hx, hy) > 120f)
             {
                 view.SetInteractHover(null);
                 return;
@@ -187,15 +182,56 @@ namespace Vacancy
 
         InteractHover PickInteractHover(Ray ray)
         {
-            var hits = Physics.RaycastAll(ray, 24f);
-            System.Array.Sort(hits, (a, b) => a.distance.CompareTo(b.distance));
+            InteractHover best = null;
+            float bestDist = float.MaxValue;
+            int bestPri = int.MaxValue;
+            ConsiderHits(Physics.RaycastAll(ray, 24f), ref best, ref bestDist, ref bestPri);
+            ConsiderHits(Physics.SphereCastAll(ray.origin, 0.18f, ray.direction, 24f), ref best, ref bestDist, ref bestPri);
+            return best;
+        }
+
+        void ConsiderHits(RaycastHit[] hits, ref InteractHover best, ref float bestDist, ref int bestPri)
+        {
+            if (hits == null) return;
             foreach (var hit in hits)
             {
-                if (IsCharacterHit(hit.collider)) continue;
-                return hit.collider != null ? hit.collider.GetComponent<InteractHover>() : null;
-            }
+                if (hit.collider == null || IsCharacterHit(hit.collider)) continue;
+                var marker = hit.collider.GetComponent<InteractHover>()
+                    ?? hit.collider.GetComponentInParent<InteractHover>();
+                if (marker == null) continue;
 
-            return null;
+                int pri = HoverPriority(marker.Kind);
+                float d = hit.distance;
+                bool closer = d + 0.001f < bestDist - 0.4f;
+                bool similar = Mathf.Abs(d - bestDist) <= 0.4f;
+                if (best == null || closer || (similar && pri < bestPri) || (similar && pri == bestPri && d < bestDist))
+                {
+                    best = marker;
+                    bestDist = d;
+                    bestPri = pri;
+                }
+            }
+        }
+
+        static int HoverPriority(string kind)
+        {
+            switch (kind)
+            {
+                case "radio":
+                case "newspaper":
+                case "phone":
+                case "deskpc":
+                case "sign":
+                    return 0;
+                case "office":
+                    return 1;
+                case "desk":
+                    return 2;
+                case "room":
+                    return 3;
+                default:
+                    return 4;
+            }
         }
 
         void HandleInteract()

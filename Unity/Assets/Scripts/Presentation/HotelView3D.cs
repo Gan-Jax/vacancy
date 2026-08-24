@@ -19,7 +19,9 @@ namespace Vacancy
         readonly Text inspectBanner;
         readonly Text pinReadout;
         readonly Transform pinMarker;
-        readonly TextMesh hoverLabel;
+        readonly Transform hoverRoot;
+        readonly Text hoverLabel;
+        readonly Text hoverScreen;
         readonly Font font;
         readonly Mesh cubeMesh;
         readonly Mesh cylinderMesh;
@@ -45,7 +47,8 @@ namespace Vacancy
             inspectBanner = BuildInspectBanner(hint.transform.parent);
             pinReadout = BuildPinReadout(hint.transform.parent);
             pinMarker = BuildPinMarker();
-            hoverLabel = BuildHoverLabel();
+            BuildHoverLabel(out hoverRoot, out hoverLabel);
+            hoverScreen = BuildCrosshairHover(hint.transform.parent);
         }
 
         public void SyncPlayer(PlayerActor player, float dt)
@@ -190,40 +193,69 @@ namespace Vacancy
 
         public void SetInteractHover(InteractHover marker)
         {
-            if (hoverLabel == null) return;
             if (marker == null)
             {
-                hoverLabel.gameObject.SetActive(false);
+                if (hoverRoot != null) hoverRoot.gameObject.SetActive(false);
+                if (hoverScreen != null) hoverScreen.gameObject.SetActive(false);
                 return;
             }
 
-            hoverLabel.text = marker.Caption();
-            hoverLabel.transform.position = marker.Anchor;
-            hoverLabel.gameObject.SetActive(true);
-            FaceCamera(hoverLabel.transform);
-        }
-
-        TextMesh BuildHoverLabel()
-        {
-            var go = new GameObject("InteractHoverLabel");
-            go.transform.SetParent(root, false);
-            var tm = go.AddComponent<TextMesh>();
-            tm.font = font;
-            tm.fontSize = 42;
-            tm.characterSize = 0.038f;
-            tm.anchor = TextAnchor.LowerCenter;
-            tm.alignment = TextAlignment.Center;
-            tm.color = Palette.Accent;
-            tm.text = "";
-            var renderer = go.GetComponent<MeshRenderer>();
-            if (renderer != null)
+            string caption = marker.Caption();
+            if (hoverLabel != null) hoverLabel.text = caption;
+            if (hoverScreen != null)
             {
-                renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
-                renderer.receiveShadows = false;
+                hoverScreen.text = caption;
+                hoverScreen.gameObject.SetActive(true);
             }
 
+            if (hoverRoot == null) return;
+            Vector3 pos = marker.Anchor;
+            if (playerCamera != null)
+            {
+                Vector3 toCam = playerCamera.transform.position - pos;
+                if (toCam.sqrMagnitude > 0.0001f) pos += toCam.normalized * 0.1f;
+            }
+
+            hoverRoot.position = pos;
+            hoverRoot.gameObject.SetActive(true);
+            BillboardHover(hoverRoot);
+        }
+
+        void BuildHoverLabel(out Transform labelRoot, out Text label)
+        {
+            var go = new GameObject("InteractHoverLabel", typeof(RectTransform), typeof(Canvas));
+            go.transform.SetParent(root, false);
+            var canvas = go.GetComponent<Canvas>();
+            canvas.renderMode = RenderMode.WorldSpace;
+            canvas.worldCamera = playerCamera;
+            canvas.overrideSorting = true;
+            canvas.sortingOrder = 80;
+            var rt = go.GetComponent<RectTransform>();
+            rt.sizeDelta = new Vector2(240f, 48f);
+            rt.localScale = Vector3.one * 0.006f;
+
+            var textGo = new GameObject("Caption", typeof(RectTransform), typeof(Text), typeof(Outline));
+            textGo.transform.SetParent(go.transform, false);
+            var textRt = textGo.GetComponent<RectTransform>();
+            textRt.anchorMin = Vector2.zero;
+            textRt.anchorMax = Vector2.one;
+            textRt.offsetMin = Vector2.zero;
+            textRt.offsetMax = Vector2.zero;
+            var text = textGo.GetComponent<Text>();
+            text.font = font;
+            text.fontSize = 34;
+            text.alignment = TextAnchor.MiddleCenter;
+            text.color = Palette.Text;
+            text.horizontalOverflow = HorizontalWrapMode.Overflow;
+            text.verticalOverflow = VerticalWrapMode.Overflow;
+            text.raycastTarget = false;
+            var outline = textGo.GetComponent<Outline>();
+            outline.effectColor = new Color(0.04f, 0.05f, 0.07f, 0.92f);
+            outline.effectDistance = new Vector2(1.4f, -1.4f);
+
             go.SetActive(false);
-            return tm;
+            labelRoot = go.transform;
+            label = text;
         }
 
         static void MarkInteract(Renderer renderer, string kind, int roomId = 0, Vector3? anchor = null)
@@ -233,7 +265,7 @@ namespace Vacancy
             marker.Kind = kind;
             marker.RoomId = roomId;
             var bounds = renderer.bounds;
-            marker.Anchor = anchor ?? new Vector3(bounds.center.x, bounds.max.y + 0.18f, bounds.center.z);
+            marker.Anchor = anchor ?? new Vector3(bounds.center.x, bounds.max.y + 0.32f, bounds.center.z);
         }
 
         void TryMarkRoomPart(string name, Renderer renderer)
@@ -260,6 +292,14 @@ namespace Vacancy
             {
                 target.rotation = Quaternion.LookRotation(toCam);
             }
+        }
+
+        void BillboardHover(Transform target)
+        {
+            if (playerCamera == null || target == null) return;
+            var cam = playerCamera.transform;
+            target.LookAt(target.position + cam.rotation * Vector3.forward, cam.rotation * Vector3.up);
+            target.Rotate(0f, 180f, 0f);
         }
 
         void BuildGround()
@@ -703,6 +743,30 @@ namespace Vacancy
             text.alignment = TextAnchor.MiddleCenter;
             text.color = Palette.Text;
             text.text = "";
+            return text;
+        }
+
+        Text BuildCrosshairHover(Transform parent)
+        {
+            var go = new GameObject("CrosshairHover", typeof(RectTransform), typeof(Text), typeof(Outline));
+            go.transform.SetParent(parent, false);
+            var rt = go.GetComponent<RectTransform>();
+            rt.anchorMin = rt.anchorMax = new Vector2(0.5f, 0.5f);
+            rt.pivot = new Vector2(0.5f, 1f);
+            rt.anchoredPosition = new Vector2(0f, -14f);
+            rt.sizeDelta = new Vector2(520f, 28f);
+            var text = go.GetComponent<Text>();
+            text.font = font;
+            text.fontSize = 18;
+            text.alignment = TextAnchor.UpperCenter;
+            text.color = Palette.Text;
+            text.horizontalOverflow = HorizontalWrapMode.Overflow;
+            text.verticalOverflow = VerticalWrapMode.Overflow;
+            text.raycastTarget = false;
+            var outline = go.GetComponent<Outline>();
+            outline.effectColor = new Color(0.04f, 0.05f, 0.07f, 0.9f);
+            outline.effectDistance = new Vector2(1.1f, -1.1f);
+            go.SetActive(false);
             return text;
         }
 
