@@ -163,6 +163,10 @@ namespace Vacancy
 
         static void SealEnvelope(NavGrid grid, BuiltFloor floor)
         {
+            // Motor-court rooms open onto an outdoor covered walk. Sealing a
+            // rectangular envelope would wall guests into the courtyard.
+            if (floor.OutdoorCourt) return;
+
             var content = floor.Content;
             if (content.W <= 0f || content.H <= 0f) return;
 

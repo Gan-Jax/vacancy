@@ -31,6 +31,8 @@ namespace Vacancy
         public Point StairsTop;
         public Point StairsBottom;
         public NavGrid BasementGrid;
+        public Rect DriveSouth;
+        public Rect PorteCochere;
 
         public const int StallCount = 8;
         public const float ParkingDriveWidth = 90f;
@@ -41,11 +43,13 @@ namespace Vacancy
 
         readonly Dictionary<string, DepartmentSpot> deptForStaff = new Dictionary<string, DepartmentSpot>();
 
-        public static HotelLayout Create(float width = 1360f, float height = 1100f)
+        public static HotelLayout Create(float width = 0f, float height = 0f)
         {
-            var building = Floorplan.InnBuildingRect(Floorplan.FlagshipGround, width, height);
-            var floor = Floorplan.CreateFloor(Floorplan.FlagshipGround, building);
-            var parking = Floorplan.AttachParking(floor, building, height);
+            var floor = Floorplan.CreateMotorCourt();
+            var parking = floor.Parking;
+            if (width <= 0f) width = floor.Bounds.X + floor.Bounds.W + 120f;
+            if (height <= 0f) height = floor.Bounds.Y + floor.Bounds.H + 100f;
+            var building = floor.Bounds;
             var navGrid = Navigation.Build(floor);
             var basementGrid = Navigation.Build(floor, -1, floor.Basement.W > 0 ? floor.Basement : floor.Lobby);
             var desk = floor.FrontDesk;
@@ -75,14 +79,20 @@ namespace Vacancy
                 Newspaper = new DeskSpot { X = desk.X, Y = desk.Y + 2f, W = 28, H = 18 },
                 DeskPhone = new DeskSpot { X = desk.X - desk.W / 2f + 20f, Y = desk.Y - 2f, W = 18, H = 16 },
                 DeskPc = new DeskSpot { X = desk.X + desk.W / 2f - 22f, Y = desk.Y - 2f, W = 28, H = 18 },
+                DriveSouth = floor.DriveSouth,
+                PorteCochere = floor.PorteCochere,
                 VacancySign = new DeskSpot
                 {
-                    X = parking.Center.X - 80f,
-                    Y = parking.Y + parking.H - 48f,
+                    X = floor.DriveSouth.W > 0
+                        ? floor.DriveSouth.X + floor.DriveSouth.W - 70f
+                        : parking.Center.X - 80f,
+                    Y = floor.DriveSouth.W > 0
+                        ? floor.DriveSouth.Y + floor.DriveSouth.H - 40f
+                        : parking.Y + parking.H - 48f,
                     W = 140,
                     H = 36
                 },
-                Spawn = new Point(desk.X + 50f, desk.Y + 70f),
+                Spawn = new Point(desk.X + 50f, desk.Y + 46f),
                 StairsTop = stairs.W > 0
                     ? new Point(stairs.X + stairs.W - floor.Tile * 2.5f, stairs.Y + stairs.H * 0.55f)
                     : new Point(desk.X, desk.Y),
@@ -157,9 +167,29 @@ namespace Vacancy
 
         public float DriveCenterX => Parking.X + Parking.W / 2f;
 
-        public Point HighwayEntry => new Point(DriveCenterX, Parking.Y + Parking.H + 28f);
+        public Point HighwayEntry
+        {
+            get
+            {
+                float y = DriveSouth.W > 0
+                    ? DriveSouth.Y + DriveSouth.H + 28f
+                    : Parking.Y + Parking.H + 28f;
+                return new Point(DriveCenterX, y);
+            }
+        }
 
-        public Point FrontEntrance => new Point(Lobby.X + Lobby.W / 2f, Lobby.Y + Lobby.H + 18f);
+        public Point FrontEntrance
+        {
+            get
+            {
+                if (Floor != null && (Floor.LotEntrance.X != 0f || Floor.LotEntrance.Y != 0f))
+                {
+                    return Floor.LotEntrance;
+                }
+
+                return new Point(Lobby.X + Lobby.W / 2f, Lobby.Y - 18f);
+            }
+        }
 
         public Point DriveLaneCorner(float carY)
         {

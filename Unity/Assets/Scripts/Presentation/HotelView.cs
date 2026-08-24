@@ -38,6 +38,10 @@ namespace Vacancy
                 {
                     Quad(area.Id, area.Rect, Palette.Corridor, 0);
                 }
+                else if (area.Kind == AreaKind.Walkway)
+                {
+                    Quad(area.Id, area.Rect, Palette.Hex("#5a6170"), 0);
+                }
             }
 
             foreach (var area in layout.Floor.Areas)

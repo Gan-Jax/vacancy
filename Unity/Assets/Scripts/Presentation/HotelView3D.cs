@@ -189,15 +189,10 @@ namespace Vacancy
         void BuildGround()
         {
             var lotRect = new Rect(-80, -80, layout.Width + 160, layout.Height + 160);
-            // Keep the dirt lot outside the inn. Drawing it under the building
-            // filled the stair well with a solid slab, so the steps vanished.
-            SlabWithHole("Lot", lotRect, layout.Building, 0.02f, 0.04f, Palette.FloorColor(8), false);
             var well = Pad(layout.Stairs, 4f);
-            var indoor = layout.Floor.Content;
-            // Edge strip stays outside the hallway walls as a foundation/eave.
-            SlabWithHole("Foundation", layout.Building, indoor, 0.025f, 0.05f, Palette.Hex("#3a3d42"), false);
-            SlabWithHole("BuildingFloor", indoor, well, 0.03f, 0.06f, Palette.Corridor);
-            SlabWithHole("Ceiling", layout.Building, well, WorldScale.CeilingY, 0.08f, Palette.Hex("#1a2030"));
+            // Dirt under the whole lot. Indoor floors, walks, and asphalt cover it.
+            // Only the stair well stays open so the steps are visible.
+            SlabWithHole("Lot", lotRect, well, 0.02f, 0.04f, Palette.FloorColor(8), false);
             if (layout.Basement.W > 0)
             {
                 SlabWithHole(
@@ -220,6 +215,10 @@ namespace Vacancy
                     Box(area.Id, area.Rect, 0.05f, 0.08f, Palette.Corridor);
                     HallRunner(area);
                 }
+                else if (area.Kind == AreaKind.Walkway)
+                {
+                    Box(area.Id, area.Rect, 0.05f, 0.08f, Palette.Hex("#5a6170"));
+                }
                 else if (area.Kind == AreaKind.Lobby)
                 {
                     SlabWithHole(
@@ -230,6 +229,13 @@ namespace Vacancy
                         0.08f,
                         Palette.LobbyFloor);
                     Walls(area.Id, area.Rect, area.Doors, Palette.LobbyWall);
+                    SlabWithHole(
+                        area.Id + "-roof",
+                        area.Rect,
+                        Pad(layout.Stairs, 4f),
+                        WorldScale.CeilingY,
+                        0.08f,
+                        Palette.Hex("#1a2030"));
                 }
                 else if (area.Kind == AreaKind.Office)
                 {
@@ -248,7 +254,24 @@ namespace Vacancy
                 }
                 else if (area.Kind == AreaKind.Parking)
                 {
-                    BuildParkingLot(area.Rect);
+                    if (area.Id == "parking") BuildParkingLot(area.Rect);
+                    else
+                    {
+                        Box(area.Id, area.Rect, 0.04f, 0.05f, Palette.Hex("#2a2c30"));
+                        float driveW = HotelLayout.ParkingDriveWidth;
+                        float driveX = layout.DriveCenterX - driveW / 2f;
+                        float x0 = Mathf.Max(area.Rect.X, driveX);
+                        float x1 = Mathf.Min(area.Rect.X + area.Rect.W, driveX + driveW);
+                        if (x1 > x0 + 8f)
+                        {
+                            Box(
+                                area.Id + "-lane",
+                                new Rect(x0, area.Rect.Y, x1 - x0, area.Rect.H),
+                                0.055f,
+                                0.03f,
+                                Palette.Hex("#3a3d42"));
+                        }
+                    }
                 }
             }
 
@@ -257,15 +280,18 @@ namespace Vacancy
                 var inner = Inset(planned.Rect, layout.Tile);
                 roomFloors[planned.Id] = Box($"RoomFloor-{planned.Id}", inner, 0.05f, 0.08f, Palette.Locked);
                 Walls($"Room-{planned.Id}", planned.Rect, DoorList(planned.DoorOpening), Palette.Wall);
+                RoomWindow(planned);
                 Box(
                     $"Bed-{planned.Id}",
                     new Rect(inner.X + inner.W * 0.2f, inner.Y + inner.H * 0.25f, inner.W * 0.55f, inner.H * 0.4f),
                     0.28f,
                     0.4f,
                     Palette.Hex("#3a455c"));
+                Box($"RoomRoof-{planned.Id}", planned.Rect, WorldScale.CeilingY, 0.08f, Palette.Hex("#1a2030"));
             }
 
-            BuildHallwayEnvelope();
+            BuildCoveredWalk();
+            BuildOuterEnvelope();
             BuildBasement();
         }
 
@@ -406,11 +432,11 @@ namespace Vacancy
 
             var lobby = layout.Lobby;
             float sitX = desk.X;
-            float sitY = desk.Y + 100f;
-            Box("Rug", new Rect(sitX - 90, sitY - 50, 180, 100), 0.055f, 0.02f, Palette.Hex("#4a2f2a"));
-            Box("ChairWest", new Rect(sitX - 72, sitY - 28, 28, 56), 0.28f, 0.42f, Palette.Hex("#5c4a3a"));
-            Box("ChairEast", new Rect(sitX + 44, sitY - 28, 28, 56), 0.28f, 0.42f, Palette.Hex("#5c4a3a"));
-            Box("CoffeeTable", new Rect(sitX - 18, sitY - 18, 36, 36), 0.32f, 0.28f, Palette.Hex("#3a2a20"));
+            float sitY = desk.Y + 42f;
+            Box("Rug", new Rect(sitX - 70, sitY - 28, 140, 56), 0.055f, 0.02f, Palette.Hex("#4a2f2a"));
+            Box("ChairWest", new Rect(sitX - 62, sitY - 18, 24, 36), 0.28f, 0.42f, Palette.Hex("#5c4a3a"));
+            Box("ChairEast", new Rect(sitX + 38, sitY - 18, 24, 36), 0.28f, 0.42f, Palette.Hex("#5c4a3a"));
+            Box("CoffeeTable", new Rect(sitX - 16, sitY - 12, 32, 24), 0.32f, 0.28f, Palette.Hex("#3a2a20"));
             Box("PlantSW", new Rect(lobby.X + 24, lobby.Y + lobby.H - 56, 22, 22), 0.55f, 1f, Palette.Hex("#2f5a3a"));
             Box("PlantSE", new Rect(lobby.X + lobby.W - 46, lobby.Y + lobby.H - 56, 22, 22), 0.55f, 1f, Palette.Hex("#2f5a3a"));
 
@@ -474,7 +500,7 @@ namespace Vacancy
             sun.shadows = LightShadows.None;
 
             PointLight("LobbyLight", layout.Lobby.Center.X, layout.Lobby.Center.Y, 2.4f, 14f, 1.5f, new Color(1f, 0.86f, 0.7f));
-            PointLight("SeatingLight", layout.FrontDesk.X, layout.FrontDesk.Y + 100f, 2.2f, 10f, 1.1f, new Color(1f, 0.82f, 0.62f));
+            PointLight("SeatingLight", layout.FrontDesk.X, layout.FrontDesk.Y + 42f, 2.2f, 10f, 1.1f, new Color(1f, 0.82f, 0.62f));
             PointLight("DeskLight", layout.FrontDesk.X, layout.FrontDesk.Y, 2.2f, 9f, 1.2f, new Color(1f, 0.9f, 0.75f));
             if (layout.Office != null)
             {
@@ -520,7 +546,8 @@ namespace Vacancy
             int corridorLights = 0;
             foreach (var area in layout.Floor.Areas)
             {
-                if (area.Kind != AreaKind.Corridor || area.Level < 0) continue;
+                if (area.Level < 0) continue;
+                if (area.Kind != AreaKind.Corridor && area.Kind != AreaKind.Walkway) continue;
                 if (area.Rect.W < 80f && area.Rect.H < 80f) continue;
                 bool eastWest = area.Rect.W >= area.Rect.H * 1.5f;
                 int lamps = eastWest
@@ -834,14 +861,169 @@ namespace Vacancy
                 Palette.Hex("#3a455c"));
         }
 
-        void BuildHallwayEnvelope()
+        void BuildCoveredWalk()
         {
-            var content = layout.Floor.Content;
-            if (content.W <= 0f || content.H <= 0f) return;
+            var floor = layout.Floor;
+            if (floor == null) return;
+            var roof = Palette.Hex("#3a3d48");
+            var pillar = Palette.Hex("#e8e0d0");
+            float roofY = WorldScale.CeilingY - 0.12f;
+            if (floor.WalkWest.W > 0f)
+            {
+                Box("WalkRoof-West", floor.WalkWest, roofY, 0.1f, roof, false);
+            }
+
+            if (floor.WalkNorth.W > 0f)
+            {
+                Box("WalkRoof-North", floor.WalkNorth, roofY, 0.1f, roof, false);
+            }
+
+            var canopy = layout.PorteCochere.W > 0f ? layout.PorteCochere : floor.PorteCochere;
+            if (canopy.W > 0f)
+            {
+                Box("PorteCochere-Roof", canopy, roofY + 0.08f, 0.16f, roof, false);
+                float inset = 18f;
+                float size = 16f;
+                SquarePillar("Porte-SW", canopy.X + inset, canopy.Y + canopy.H - inset, size, pillar);
+                SquarePillar("Porte-SE", canopy.X + canopy.W - inset, canopy.Y + canopy.H - inset, size, pillar);
+                SquarePillar("Porte-NW", canopy.X + inset, canopy.Y + inset, size, pillar);
+                SquarePillar("Porte-NE", canopy.X + canopy.W - inset, canopy.Y + inset, size, pillar);
+                PointLight(
+                    "PorteLight",
+                    canopy.Center.X,
+                    canopy.Center.Y,
+                    2.6f,
+                    12f,
+                    1.2f,
+                    new Color(1f, 0.9f, 0.7f));
+            }
+
+            foreach (var room in floor.Rooms)
+            {
+                if (room.DoorSide == "east" && floor.WalkWest.W > 0f)
+                {
+                    SquarePillar(
+                        $"WalkPillar-{room.Id}",
+                        floor.WalkWest.X + floor.WalkWest.W - 6f,
+                        room.Center.Y,
+                        10f,
+                        pillar);
+                }
+                else if (room.DoorSide == "south" && floor.WalkNorth.W > 0f)
+                {
+                    SquarePillar(
+                        $"WalkPillar-{room.Id}",
+                        room.Center.X,
+                        floor.WalkNorth.Y + floor.WalkNorth.H - 6f,
+                        10f,
+                        pillar);
+                }
+            }
+        }
+
+        void SquarePillar(string name, float x, float y, float size, Color color)
+        {
+            Box(
+                name,
+                new Rect(x - size / 2f, y - size / 2f, size, size),
+                WorldScale.WallHeight * 0.48f,
+                WorldScale.WallHeight * 0.96f,
+                color);
+        }
+
+        void RoomWindow(PlannedRoom planned)
+        {
+            var door = planned.DoorOpening;
+            if (door == null) return;
+            float thick = layout.Tile;
+            float winAlong = 32f;
+            float gap = 8f;
+            var glass = Palette.Hex("#7ec8e3");
+            if (door.Side == "east")
+            {
+                float y0 = door.Center.Y + door.Width / 2f + gap;
+                if (y0 + winAlong > planned.Rect.Y + planned.Rect.H - thick)
+                {
+                    y0 = door.Center.Y - door.Width / 2f - gap - winAlong;
+                }
+
+                Box(
+                    $"Window-{planned.Id}",
+                    new Rect(planned.Rect.X + planned.Rect.W - thick * 0.45f, y0, thick * 0.4f, winAlong),
+                    1.35f,
+                    1.1f,
+                    glass,
+                    false);
+            }
+            else if (door.Side == "south")
+            {
+                float x0 = door.Center.X + door.Width / 2f + gap;
+                if (x0 + winAlong > planned.Rect.X + planned.Rect.W - thick)
+                {
+                    x0 = door.Center.X - door.Width / 2f - gap - winAlong;
+                }
+
+                Box(
+                    $"Window-{planned.Id}",
+                    new Rect(x0, planned.Rect.Y + planned.Rect.H - thick * 0.45f, winAlong, thick * 0.4f),
+                    1.35f,
+                    1.1f,
+                    glass,
+                    false);
+            }
+        }
+
+        void BuildOuterEnvelope()
+        {
+            var floor = layout.Floor;
+            if (floor == null) return;
             var color = Palette.Hex("#2c3348");
-            AddSide("Envelope-N", "north", content, null, color, 0f);
-            AddSide("Envelope-W", "west", content, null, color, 0f);
-            AddSide("Envelope-E", "east", content, null, color, 0f);
+            if (!floor.OutdoorCourt)
+            {
+                var content = floor.Content;
+                if (content.W <= 0f || content.H <= 0f) return;
+                AddSide("Envelope-N", "north", content, null, color, 0f);
+                AddSide("Envelope-W", "west", content, null, color, 0f);
+                AddSide("Envelope-E", "east", content, null, color, 0f);
+                return;
+            }
+
+            float thick = 8f;
+            float x0 = floor.CornerMass.W > 0f ? floor.CornerMass.X : layout.Lobby.X;
+            float y0 = floor.CornerMass.W > 0f ? floor.CornerMass.Y : layout.Lobby.Y;
+            float y1 = layout.Lobby.Y + layout.Lobby.H;
+            float x1 = x0;
+            foreach (var room in floor.Rooms)
+            {
+                x1 = Mathf.Max(x1, room.Rect.X + room.Rect.W);
+            }
+
+            Box(
+                "Envelope-West",
+                new Rect(x0 - thick, y0, thick, y1 - y0),
+                WorldScale.WallHeight * 0.5f,
+                WorldScale.WallHeight,
+                color);
+            Box(
+                "Envelope-North",
+                new Rect(x0 - thick, y0 - thick, x1 - x0 + thick, thick),
+                WorldScale.WallHeight * 0.5f,
+                WorldScale.WallHeight,
+                color);
+            float northDepth = floor.WalkNorth.H > 0f
+                ? floor.WalkNorth.Y + floor.WalkNorth.H - y0
+                : floor.CornerMass.H;
+            Box(
+                "Envelope-NE",
+                new Rect(x1, y0 - thick, thick, northDepth + thick),
+                WorldScale.WallHeight * 0.5f,
+                WorldScale.WallHeight,
+                color);
+            if (floor.CornerMass.W > 0f)
+            {
+                Box("CornerMass", floor.CornerMass, WorldScale.WallHeight * 0.5f, WorldScale.WallHeight, color);
+                Box("CornerRoof", floor.CornerMass, WorldScale.CeilingY, 0.08f, Palette.Hex("#1a2030"));
+            }
         }
 
         void Walls(string name, Rect rect, List<Door> doors, Color color, float yBottom = 0f, string skipSide = null)

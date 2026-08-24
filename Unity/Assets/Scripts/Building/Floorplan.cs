@@ -13,6 +13,7 @@ namespace Vacancy
         public const string Stairs = "stairs";
         public const string Basement = "basement";
         public const string Storage = "storage";
+        public const string Walkway = "walkway";
     }
 
     public sealed class BandSpec
@@ -114,6 +115,13 @@ namespace Vacancy
         public OfficeSpot Office;
         public DeskSpot FrontDesk;
         public Dictionary<string, DepartmentSpot> Departments = new Dictionary<string, DepartmentSpot>();
+        public Rect WalkWest;
+        public Rect WalkNorth;
+        public Rect PorteCochere;
+        public Rect DriveSouth;
+        public Rect CornerMass;
+        public Point LotEntrance;
+        public bool OutdoorCourt;
     }
 
     public static class Floorplan
@@ -128,24 +136,14 @@ namespace Vacancy
             SideCorridor = 50,
             DoorWidth = 40,
             RoomSize = new Point(GameConfig.RoomWidth, GameConfig.RoomHeight),
-            MaxRoomsPerRow = 6,
-            Bands = new List<BandSpec>
-            {
-                // Exterior halls wrap the guest-room block so doors open onto
-                // indoor corridors, not the lot. Room rows sit back-to-back.
-                new BandSpec { Kind = "corridor", Height = 60 },
-                new BandSpec { Kind = "rooms", DoorSide = "north" },
-                new BandSpec { Kind = "rooms", DoorSide = "south" },
-                new BandSpec { Kind = "corridor", Height = 60 },
-                new BandSpec { Kind = "lobby", Height = 280, Grow = true },
-                new BandSpec { Kind = "service", Height = 90 }
-            }
+            MaxRoomsPerRow = 8,
+            Bands = new List<BandSpec>()
         };
 
         static readonly HashSet<string> PublicKinds = new HashSet<string>
         {
             AreaKind.Corridor, AreaKind.Lobby, AreaKind.Department, AreaKind.Parking,
-            AreaKind.Stairs, AreaKind.Basement, AreaKind.Storage
+            AreaKind.Stairs, AreaKind.Basement, AreaKind.Storage, AreaKind.Walkway
         };
 
         static readonly DepartmentDef[] Departments =
@@ -170,69 +168,50 @@ namespace Vacancy
             }
         }
 
-        public static Rect InnBuildingRect(
-            FloorSpec spec,
-            float lotWidth,
-            float lotHeight,
-            float marginX = 48f,
-            float marginY = 40f,
-            float parkingDepth = 280f)
+        public static BuiltFloor CreateMotorCourt(FloorSpec spec = null)
         {
-            float tile = spec.Tile;
-            float Down(float value) => (float)(System.Math.Floor(value / tile) * tile);
-            float roomW = Down(spec.RoomSize.X);
-            int cols = spec.MaxRoomsPerRow > 0 ? spec.MaxRoomsPerRow : 6;
-            float innW = cols * roomW + Down(spec.SideCorridor) * 2f + Down(spec.Edge) * 2f;
-            float innH = Down(lotHeight - marginY - parkingDepth);
-            return new Rect(Down((lotWidth - innW) / 2f), marginY, innW, innH);
-        }
-
-        public static Rect AttachParking(BuiltFloor floor, Rect building, float lotHeight)
-        {
-            float tile = floor.Tile;
-            float Down(float value) => (float)(System.Math.Floor(value / tile) * tile);
-            // Meet the last interior band so the lot is not sealed behind the
-            // 20-unit building edge (that strip was never stamped walkable).
-            float joinY = floor.Content.H > 0f
-                ? Down(floor.Content.Y + floor.Content.H - tile)
-                : building.Y + building.H;
-            float h = Down(lotHeight - joinY);
-            if (h < tile * 8f) h = tile * 20f;
-            var parking = new Rect(building.X, joinY, building.W, h);
-            floor.Areas.Add(new FloorArea
-            {
-                Id = "parking",
-                Kind = AreaKind.Parking,
-                Label = "Parking lot",
-                Rect = parking
-            });
-            floor.Parking = parking;
-            float south = System.Math.Max(building.Y + building.H, parking.Y + parking.H);
-            floor.Bounds = new Rect(building.X, building.Y, building.W, Down(south - building.Y));
-            return parking;
-        }
-
-        public static BuiltFloor CreateFloor(FloorSpec spec, Rect bounds)
-        {
+            spec = spec ?? FlagshipGround;
             float tile = spec.Tile;
             float Down(float value) => (float)(System.Math.Floor(value / tile) * tile);
 
-            float edge = Down(spec.Edge);
-            var content = new Rect(
-                bounds.X + edge,
-                bounds.Y + edge,
-                Down(bounds.W - edge * 2f),
-                Down(bounds.H - edge * 2f));
+            // Facade along the courtyard walk; depth back from the door.
+            float roomAlong = Down(spec.RoomSize.X);
+            float roomDepth = Down(spec.RoomSize.Y);
+            float walkW = Down(spec.SideCorridor > 0 ? spec.SideCorridor : 50f);
+            float originX = Down(40);
+            float originY = Down(40);
+            const int westCount = 8;
+            const int northCount = 4;
+            float lobbyW = Down(280);
+            float lobbyH = Down(280);
+            float canopyH = Down(80);
 
-            var roomSize = new Point(Down(spec.RoomSize.X), Down(spec.RoomSize.Y));
-            int fit = System.Math.Max(
-                1,
-                (int)System.Math.Floor((content.W - Down(spec.SideCorridor) * 2f) / roomSize.X));
-            int roomsPerRow = spec.MaxRoomsPerRow > 0 ? System.Math.Min(fit, spec.MaxRoomsPerRow) : fit;
-            float roomsBlockW = roomsPerRow * roomSize.X;
-            float roomsBlockX = content.X + Down((content.W - roomsBlockW) / 2f);
+            var corner = new Rect(originX, originY, roomDepth, roomDepth);
+            var northWing = new Rect(originX + roomDepth, originY, northCount * roomAlong, roomDepth);
+            var westWing = new Rect(originX, originY + roomDepth, roomDepth, westCount * roomAlong);
+            var walkNorth = new Rect(northWing.X, northWing.Y + northWing.H, northWing.W, walkW);
+            float walkWestY = walkNorth.Y + walkNorth.H;
+            var walkWest = new Rect(
+                westWing.X + westWing.W,
+                walkWestY,
+                walkW,
+                westWing.Y + westWing.H - walkWestY);
+            var lobbyRect = new Rect(originX, westWing.Y + westWing.H, lobbyW, lobbyH);
+            var parking = new Rect(
+                walkNorth.X + walkW,
+                walkNorth.Y + walkNorth.H,
+                northWing.X + northWing.W - (walkNorth.X + walkW),
+                lobbyRect.Y - (walkNorth.Y + walkNorth.H));
+            var canopy = new Rect(lobbyRect.X, lobbyRect.Y + lobbyRect.H, Down(440), canopyH);
+            var driveSouth = new Rect(
+                lobbyRect.X + lobbyRect.W,
+                lobbyRect.Y,
+                northWing.X + northWing.W - (lobbyRect.X + lobbyRect.W),
+                lobbyRect.H + canopyH);
 
-            float[] bandHeights = ResolveBandHeights(spec.Bands, content.H, roomSize.Y, tile);
+            float east = northWing.X + northWing.W;
+            float south = canopy.Y + canopy.H;
+            var bounds = new Rect(originX, originY, Down(east - originX), Down(south - originY));
 
             var floor = new BuiltFloor
             {
@@ -242,171 +221,193 @@ namespace Vacancy
                 Tile = tile,
                 Spec = spec,
                 Bounds = bounds,
-                Content = content,
-                RoomsPerRow = roomsPerRow,
-                RoomSize = roomSize
+                Content = lobbyRect,
+                RoomsPerRow = westCount,
+                RoomSize = new Point(roomAlong, roomDepth),
+                OutdoorCourt = true,
+                WalkWest = walkWest,
+                WalkNorth = walkNorth,
+                PorteCochere = canopy,
+                DriveSouth = driveSouth,
+                CornerMass = corner,
+                Lobby = lobbyRect,
+                Parking = parking
             };
 
-            float cursorY = content.Y;
-            for (int bandIndex = 0; bandIndex < spec.Bands.Count; bandIndex++)
+            AddOpenArea(floor, "walk-north", AreaKind.Walkway, "Covered walk", walkNorth);
+            AddOpenArea(floor, "walk-west", AreaKind.Walkway, "Covered walk", walkWest);
+            AddOpenArea(floor, "parking", AreaKind.Parking, "Parking lot", parking);
+            AddOpenArea(floor, "parking-drive", AreaKind.Parking, "Drive", driveSouth);
+            AddOpenArea(floor, "porte-cochere", AreaKind.Walkway, "Porte-cochère", canopy);
+
+            // Long west wing, rooms nearest the office first, doors facing the lot.
+            for (int i = 0; i < westCount; i++)
             {
-                var band = spec.Bands[bandIndex];
-                float height = bandHeights[bandIndex];
-                var bandRect = new Rect(content.X, cursorY, content.W, height);
-
-                if (band.Kind == "rooms")
-                {
-                    for (int col = 0; col < roomsPerRow; col++)
-                    {
-                        var roomRect = new Rect(
-                            roomsBlockX + col * roomSize.X,
-                            cursorY,
-                            roomSize.X,
-                            height);
-                        int id = floor.Rooms.Count + 1;
-                        var door = MakeDoor(roomRect, band.DoorSide, spec.DoorWidth, 0.5f, tile);
-                        floor.Areas.Add(new FloorArea
-                        {
-                            Id = $"room-{id}",
-                            Kind = AreaKind.GuestRoom,
-                            Token = $"room:{id}",
-                            Label = $"Room {id}",
-                            Rect = roomRect,
-                            Walls = true,
-                            Doors = new List<Door> { door },
-                            RoomId = id
-                        });
-                        floor.Rooms.Add(new PlannedRoom
-                        {
-                            Id = id,
-                            Rect = roomRect,
-                            Center = roomRect.Center,
-                            DoorSide = door.Side,
-                            Door = door.Center,
-                            DoorOpening = door,
-                            Approach = OutsidePoint(door, tile)
-                        });
-                    }
-
-                    PushSideCorridors(floor.Areas, content, bandRect, roomsBlockX, roomsBlockW);
-                }
-                else if (band.Kind == "lobby")
-                {
-                    var lobbyRect = new Rect(roomsBlockX, cursorY, roomsBlockW, height);
-                    floor.Lobby = lobbyRect;
-                    // Reception reads south→north the way a guest walks in from
-                    // the lot: double doors, waiting chairs, front desk, then
-                    // the office (PC behind the counter). Flanking passages
-                    // lead to the guest-room corridors.
-                    floor.Areas.Add(new FloorArea
-                    {
-                        Id = "lobby",
-                        Kind = AreaKind.Lobby,
-                        Label = "Lobby",
-                        Rect = lobbyRect,
-                        Walls = true,
-                        Doors = new List<Door>
-                        {
-                            MakeDoor(lobbyRect, "north", spec.DoorWidth, 0.14f, tile),
-                            MakeDoor(lobbyRect, "north", spec.DoorWidth, 0.86f, tile),
-                            MakeDoor(lobbyRect, "south", spec.DoorWidth * 2f, 0.5f, tile),
-                            MakeDoor(lobbyRect, "west", spec.DoorWidth, 0.72f, tile),
-                            MakeDoor(lobbyRect, "east", spec.DoorWidth, 0.72f, tile)
-                        }
-                    });
-
-                    float officeW = Down(300);
-                    float officeH = Down(100);
-                    float stairW = Down(90);
-                    var backBlock = new Rect(
-                        lobbyRect.X + Down((lobbyRect.W - officeW) / 2f),
-                        lobbyRect.Y + Down(20),
-                        officeW,
-                        officeH);
-                    var stairsRect = new Rect(backBlock.X, backBlock.Y, stairW, officeH);
-                    var officeRect = new Rect(
-                        backBlock.X + stairW,
-                        backBlock.Y,
-                        officeW - stairW,
-                        officeH);
-                    var stairsEast = MakeDoor(stairsRect, "east", spec.DoorWidth, 0.5f, tile);
-                    floor.Areas.Add(new FloorArea
-                    {
-                        Id = "stairs",
-                        Kind = AreaKind.Stairs,
-                        Label = "Basement stairs",
-                        Rect = stairsRect,
-                        Walls = true,
-                        Doors = new List<Door> { stairsEast }
-                    });
-                    floor.Stairs = stairsRect;
-                    float deskH = Down(40);
-                    float staffAlley = Down(60);
-                    floor.FrontDesk = new DeskSpot
-                    {
-                        X = backBlock.X + backBlock.W / 2f,
-                        Y = backBlock.Y + backBlock.H + staffAlley + deskH / 2f,
-                        W = Down(160),
-                        H = deskH
-                    };
-
-                    float officeDoorAlong = Geometry.Clamp(
-                        (floor.FrontDesk.X - officeRect.X) / officeRect.W,
-                        0.2f,
-                        0.8f);
-                    var officeDoor = MakeDoor(officeRect, "south", spec.DoorWidth, officeDoorAlong, tile);
-                    var officeWest = MakeDoor(officeRect, "west", spec.DoorWidth, 0.5f, tile);
-                    floor.Areas.Add(new FloorArea
-                    {
-                        Id = "office",
-                        Kind = AreaKind.Office,
-                        Token = "office",
-                        Label = "Office",
-                        Rect = officeRect,
-                        Walls = true,
-                        Doors = new List<Door> { officeDoor, officeWest }
-                    });
-                    var officeCenter = officeRect.Center;
-                    floor.Office = new OfficeSpot
-                    {
-                        X = officeCenter.X,
-                        Y = officeCenter.Y,
-                        W = officeRect.W,
-                        H = officeRect.H,
-                        Rect = officeRect,
-                        Door = officeDoor.Center,
-                        Approach = OutsidePoint(officeDoor, tile)
-                    };
-
-                    PushSideCorridors(floor.Areas, content, bandRect, roomsBlockX, roomsBlockW);
-                }
-                else if (band.Kind == "service")
-                {
-                    floor.Areas.Add(new FloorArea
-                    {
-                        Id = $"service-{bandIndex}",
-                        Kind = AreaKind.Corridor,
-                        Label = "Service corridor",
-                        Rect = bandRect
-                    });
-                }
-                else
-                {
-                    floor.Areas.Add(new FloorArea
-                    {
-                        Id = $"corridor-{bandIndex}",
-                        Kind = AreaKind.Corridor,
-                        Label = "Corridor",
-                        Rect = bandRect
-                    });
-                }
-
-                cursorY += height;
+                var roomRect = new Rect(
+                    westWing.X,
+                    westWing.Y + westWing.H - (i + 1) * roomAlong,
+                    roomDepth,
+                    roomAlong);
+                AddGuestRoom(floor, spec, roomRect, "east", tile);
             }
+
+            for (int i = 0; i < northCount; i++)
+            {
+                var roomRect = new Rect(northWing.X + i * roomAlong, northWing.Y, roomAlong, roomDepth);
+                AddGuestRoom(floor, spec, roomRect, "south", tile);
+            }
+
+            var northDoor = MakeDoor(lobbyRect, "north", spec.DoorWidth, 0.42f, tile);
+            floor.Areas.Add(new FloorArea
+            {
+                Id = "lobby",
+                Kind = AreaKind.Lobby,
+                Label = "Lobby",
+                Rect = lobbyRect,
+                Walls = true,
+                Doors = new List<Door>
+                {
+                    northDoor,
+                    MakeDoor(lobbyRect, "south", spec.DoorWidth * 2f, 0.5f, tile),
+                    MakeDoor(lobbyRect, "east", spec.DoorWidth, 0.78f, tile)
+                }
+            });
+            floor.LotEntrance = OutsidePoint(northDoor, tile);
+
+            float officeW = Down(220);
+            float officeH = Down(90);
+            float stairW = Down(80);
+            var backBlock = new Rect(
+                lobbyRect.X + Down((lobbyRect.W - officeW) / 2f),
+                lobbyRect.Y + Down(16),
+                officeW,
+                officeH);
+            var stairsRect = new Rect(backBlock.X, backBlock.Y, stairW, officeH);
+            var officeRect = new Rect(
+                backBlock.X + stairW,
+                backBlock.Y,
+                officeW - stairW,
+                officeH);
+            floor.Areas.Add(new FloorArea
+            {
+                Id = "stairs",
+                Kind = AreaKind.Stairs,
+                Label = "Basement stairs",
+                Rect = stairsRect,
+                Walls = true,
+                Doors = new List<Door> { MakeDoor(stairsRect, "east", spec.DoorWidth, 0.5f, tile) }
+            });
+            floor.Stairs = stairsRect;
+
+            float deskH = Down(40);
+            float staffAlley = Down(50);
+            floor.FrontDesk = new DeskSpot
+            {
+                X = backBlock.X + backBlock.W / 2f,
+                Y = backBlock.Y + backBlock.H + staffAlley + deskH / 2f,
+                W = Down(160),
+                H = deskH
+            };
+
+            float officeDoorAlong = Geometry.Clamp(
+                (floor.FrontDesk.X - officeRect.X) / officeRect.W,
+                0.2f,
+                0.8f);
+            var officeDoor = MakeDoor(officeRect, "south", spec.DoorWidth, officeDoorAlong, tile);
+            var officeWest = MakeDoor(officeRect, "west", spec.DoorWidth, 0.5f, tile);
+            floor.Areas.Add(new FloorArea
+            {
+                Id = "office",
+                Kind = AreaKind.Office,
+                Token = "office",
+                Label = "Office",
+                Rect = officeRect,
+                Walls = true,
+                Doors = new List<Door> { officeDoor, officeWest }
+            });
+            var officeCenter = officeRect.Center;
+            floor.Office = new OfficeSpot
+            {
+                X = officeCenter.X,
+                Y = officeCenter.Y,
+                W = officeRect.W,
+                H = officeRect.H,
+                Rect = officeRect,
+                Door = officeDoor.Center,
+                Approach = OutsidePoint(officeDoor, tile)
+            };
 
             AttachBasement(floor, spec.DoorWidth, tile);
             PruneUnusableDoors(floor.Areas, tile);
             return floor;
+        }
+
+        public static BuiltFloor CreateFloor(FloorSpec spec, Rect bounds)
+        {
+            _ = bounds;
+            return CreateMotorCourt(spec);
+        }
+
+        public static Rect InnBuildingRect(
+            FloorSpec spec,
+            float lotWidth,
+            float lotHeight,
+            float marginX = 48f,
+            float marginY = 40f,
+            float parkingDepth = 280f)
+        {
+            _ = lotWidth;
+            _ = lotHeight;
+            _ = marginX;
+            _ = marginY;
+            _ = parkingDepth;
+            return CreateMotorCourt(spec).Bounds;
+        }
+
+        public static Rect AttachParking(BuiltFloor floor, Rect building, float lotHeight)
+        {
+            _ = building;
+            _ = lotHeight;
+            return floor.Parking;
+        }
+
+        static void AddOpenArea(BuiltFloor floor, string id, string kind, string label, Rect rect)
+        {
+            if (rect.W <= 0f || rect.H <= 0f) return;
+            floor.Areas.Add(new FloorArea
+            {
+                Id = id,
+                Kind = kind,
+                Label = label,
+                Rect = rect
+            });
+        }
+
+        static void AddGuestRoom(BuiltFloor floor, FloorSpec spec, Rect roomRect, string doorSide, float tile)
+        {
+            int id = floor.Rooms.Count + 1;
+            var door = MakeDoor(roomRect, doorSide, spec.DoorWidth, 0.5f, tile);
+            floor.Areas.Add(new FloorArea
+            {
+                Id = $"room-{id}",
+                Kind = AreaKind.GuestRoom,
+                Token = $"room:{id}",
+                Label = $"Room {id}",
+                Rect = roomRect,
+                Walls = true,
+                Doors = new List<Door> { door },
+                RoomId = id
+            });
+            floor.Rooms.Add(new PlannedRoom
+            {
+                Id = id,
+                Rect = roomRect,
+                Center = roomRect.Center,
+                DoorSide = door.Side,
+                Door = door.Center,
+                DoorOpening = door,
+                Approach = OutsidePoint(door, tile)
+            });
         }
 
         static void AttachBasement(BuiltFloor floor, float doorWidth, float tile)
@@ -444,8 +445,8 @@ namespace Vacancy
 
             foreach (var dept in Departments)
             {
-                float deptW = Down(170);
-                float deptH = Down(80);
+                float deptW = Down(System.Math.Min(170, (lobby.W - tile * 8f) / 2f));
+                float deptH = Down(System.Math.Min(80, lobby.H * 0.35f));
                 var deptRect = new Rect(
                     dept.Side == "left"
                         ? lobby.X + tile * 2f
@@ -478,57 +479,6 @@ namespace Vacancy
                     W = deptRect.W,
                     H = deptRect.H
                 };
-            }
-        }
-
-        static float[] ResolveBandHeights(List<BandSpec> bands, float totalHeight, float roomHeight, float tile)
-        {
-            var heights = new float[bands.Count];
-            var growIndexes = new List<int>();
-            float used = 0f;
-            for (int i = 0; i < bands.Count; i++)
-            {
-                heights[i] = bands[i].Kind == "rooms"
-                    ? roomHeight
-                    : (float)(System.Math.Floor((bands[i].Height > 0 ? bands[i].Height : tile * 6f) / tile) * tile);
-                used += heights[i];
-                if (bands[i].Grow) growIndexes.Add(i);
-            }
-
-            float slack = totalHeight - used;
-            if (slack > 0 && growIndexes.Count > 0)
-            {
-                float share = (float)(System.Math.Floor(slack / growIndexes.Count / tile) * tile);
-                foreach (int i in growIndexes) heights[i] += share;
-            }
-
-            return heights;
-        }
-
-        static void PushSideCorridors(List<FloorArea> areas, Rect content, Rect bandRect, float blockX, float blockW)
-        {
-            var left = new Rect(content.X, bandRect.Y, System.Math.Max(0, blockX - content.X), bandRect.H);
-            var right = new Rect(blockX + blockW, bandRect.Y, System.Math.Max(0, content.X + content.W - (blockX + blockW)), bandRect.H);
-            if (left.W > 0)
-            {
-                areas.Add(new FloorArea
-                {
-                    Id = $"side-left-{System.Math.Round(bandRect.Y)}",
-                    Kind = AreaKind.Corridor,
-                    Label = "Corridor",
-                    Rect = left
-                });
-            }
-
-            if (right.W > 0)
-            {
-                areas.Add(new FloorArea
-                {
-                    Id = $"side-right-{System.Math.Round(bandRect.Y)}",
-                    Kind = AreaKind.Corridor,
-                    Label = "Corridor",
-                    Rect = right
-                });
             }
         }
 
