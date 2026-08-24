@@ -143,20 +143,19 @@ namespace Vacancy
 
         void BuildGround()
         {
-            Box(
-                "Lot",
-                new Rect(-80, -80, layout.Width + 160, layout.Height + 160),
-                0.02f,
-                0.04f,
-                Palette.FloorColor(8));
-            SlabWithHole("BuildingFloor", layout.Building, layout.Stairs, 0.03f, 0.06f, Palette.Corridor);
-            SlabWithHole("Ceiling", layout.Building, layout.Stairs, WorldScale.CeilingY, 0.08f, Palette.Hex("#1a2030"));
+            var lotRect = new Rect(-80, -80, layout.Width + 160, layout.Height + 160);
+            // Keep the dirt lot outside the inn. Drawing it under the building
+            // filled the stair well with a solid slab, so the steps vanished.
+            SlabWithHole("Lot", lotRect, layout.Building, 0.02f, 0.04f, Palette.FloorColor(8), false);
+            var well = Pad(layout.Stairs, 4f);
+            SlabWithHole("BuildingFloor", layout.Building, well, 0.03f, 0.06f, Palette.Corridor);
+            SlabWithHole("Ceiling", layout.Building, well, WorldScale.CeilingY, 0.08f, Palette.Hex("#1a2030"));
             if (layout.Basement.W > 0)
             {
                 SlabWithHole(
                     "BasementCeiling",
                     layout.Basement,
-                    layout.Stairs,
+                    well,
                     WorldScale.BasementFloorY + WorldScale.WallHeight + 0.12f,
                     0.06f,
                     Palette.Hex("#1a2030"));
@@ -177,7 +176,7 @@ namespace Vacancy
                     SlabWithHole(
                         area.Id + "-floor",
                         Inset(area.Rect, layout.Tile),
-                        layout.Stairs,
+                        Pad(layout.Stairs, 2f),
                         0.05f,
                         0.08f,
                         Palette.LobbyFloor);
@@ -732,13 +731,19 @@ namespace Vacancy
 
         static string lotId(string name) => "Parking-" + name;
 
-        void SlabWithHole(string name, Rect outer, Rect hole, float yCenter, float height, Color color)
+        static Rect Pad(Rect rect, float pad)
+        {
+            if (rect.W <= 0f || rect.H <= 0f) return rect;
+            return new Rect(rect.X - pad, rect.Y - pad, rect.W + pad * 2f, rect.H + pad * 2f);
+        }
+
+        void SlabWithHole(string name, Rect outer, Rect hole, float yCenter, float height, Color color, bool collider = true)
         {
             if (hole.W <= 0f || hole.H <= 0f ||
                 hole.X >= outer.X + outer.W || hole.X + hole.W <= outer.X ||
                 hole.Y >= outer.Y + outer.H || hole.Y + hole.H <= outer.Y)
             {
-                Box(name, outer, yCenter, height, color);
+                Box(name, outer, yCenter, height, color, collider);
                 return;
             }
 
@@ -748,26 +753,26 @@ namespace Vacancy
             float holeY1 = Mathf.Min(outer.Y + outer.H, hole.Y + hole.H);
             if (holeY0 > outer.Y + 2f)
             {
-                Box(name + "-N", new Rect(outer.X, outer.Y, outer.W, holeY0 - outer.Y), yCenter, height, color);
+                Box(name + "-N", new Rect(outer.X, outer.Y, outer.W, holeY0 - outer.Y), yCenter, height, color, collider);
             }
 
             if (holeY1 < outer.Y + outer.H - 2f)
             {
-                Box(name + "-S", new Rect(outer.X, holeY1, outer.W, outer.Y + outer.H - holeY1), yCenter, height, color);
+                Box(name + "-S", new Rect(outer.X, holeY1, outer.W, outer.Y + outer.H - holeY1), yCenter, height, color, collider);
             }
 
             if (holeX0 > outer.X + 2f)
             {
-                Box(name + "-W", new Rect(outer.X, holeY0, holeX0 - outer.X, holeY1 - holeY0), yCenter, height, color);
+                Box(name + "-W", new Rect(outer.X, holeY0, holeX0 - outer.X, holeY1 - holeY0), yCenter, height, color, collider);
             }
 
             if (holeX1 < outer.X + outer.W - 2f)
             {
-                Box(name + "-E", new Rect(holeX1, holeY0, outer.X + outer.W - holeX1, holeY1 - holeY0), yCenter, height, color);
+                Box(name + "-E", new Rect(holeX1, holeY0, outer.X + outer.W - holeX1, holeY1 - holeY0), yCenter, height, color, collider);
             }
         }
 
-        Renderer Box(string name, Rect rect, float yCenter, float height, Color color)
+        Renderer Box(string name, Rect rect, float yCenter, float height, Color color, bool collider = true)
         {
             var go = MeshObject(
                 name,
@@ -775,7 +780,8 @@ namespace Vacancy
                 cubeMesh,
                 WorldScale.ToWorld(rect.X + rect.W / 2f, rect.Y + rect.H / 2f, yCenter),
                 WorldScale.Size(rect.W, height, rect.H),
-                color);
+                color,
+                collider);
             return go.GetComponent<Renderer>();
         }
 
