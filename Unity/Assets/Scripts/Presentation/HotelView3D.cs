@@ -13,6 +13,7 @@ namespace Vacancy
         readonly Dictionary<int, Renderer> roomFloors = new Dictionary<int, Renderer>();
         Renderer vacancySign;
         readonly List<CharacterView> characters = new List<CharacterView>();
+        readonly List<CarView> carViews = new List<CarView>();
         CharacterModel playerBody;
         readonly Text hint;
         readonly Text inspectBanner;
@@ -66,12 +67,29 @@ namespace Vacancy
             vacancySign.sharedMaterial = Mat(state.VacancyOpen ? Palette.Hex("#2f6b3a") : Palette.Hex("#7a2e2e"));
 
             int used = 0;
+            int deskIndex = 0;
             for (int i = 0; i < state.WaitingGuests.Count; i++)
             {
                 var guest = state.WaitingGuests[i];
-                var slot = layout.CheckInLineSlot(i);
-                string tag = i == 0 ? $"{guest.Name} ★" : guest.Name;
-                PlaceCharacter(used++, slot.X, slot.Y, Palette.Hex("#e8a0bf"), tag, layout.FrontDesk.X, layout.FrontDesk.Y);
+                string phase = string.IsNullOrEmpty(guest.ArrivePhase) ? "waiting" : guest.ArrivePhase;
+                if (phase == "driving" || phase == "driving_away") continue;
+
+                float x = guest.X;
+                float y = guest.Y;
+                float lookX = float.NaN;
+                float lookY = float.NaN;
+                string tag = guest.Name;
+                if (phase == "waiting")
+                {
+                    var slot = layout.CheckInLineSlot(deskIndex++);
+                    x = slot.X;
+                    y = slot.Y;
+                    lookX = layout.FrontDesk.X;
+                    lookY = layout.FrontDesk.Y;
+                    tag = deskIndex == 1 ? $"{guest.Name} ★" : guest.Name;
+                }
+
+                PlaceCharacter(used++, x, y, Palette.Hex("#e8a0bf"), tag, lookX, lookY, guest.FootY);
             }
 
             foreach (var guest in state.ActiveGuests)
@@ -112,6 +130,14 @@ namespace Vacancy
             }
 
             for (int i = used; i < characters.Count; i++) characters[i].Model.GameObject.SetActive(false);
+
+            int carUsed = 0;
+            foreach (var car in state.Cars)
+            {
+                PlaceCar(carUsed++, car);
+            }
+
+            for (int i = carUsed; i < carViews.Count; i++) carViews[i].Root.gameObject.SetActive(false);
 
             if (hint != null) hint.text = HintText(state, staff);
         }
@@ -645,6 +671,77 @@ namespace Vacancy
             }
         }
 
+        void PlaceCar(int index, GuestCar car)
+        {
+            while (carViews.Count <= index)
+            {
+                carViews.Add(BuildGuestCar());
+            }
+
+            var view = carViews[index];
+            view.Root.gameObject.SetActive(true);
+            Color color = Palette.Hex(string.IsNullOrEmpty(car.Color) ? "#4a5a6a" : car.Color);
+            if (view.Body != null) view.Body.sharedMaterial = Mat(color);
+
+            float cx = car.X + HotelLayout.ParkedCarWidth / 2f;
+            float cy = car.Y + HotelLayout.ParkedCarHeight / 2f;
+            view.Root.position = WorldScale.ToWorld(cx, cy, 0f);
+
+            if (float.IsNaN(view.LastX))
+            {
+                view.LastX = car.X;
+                view.LastY = car.Y;
+                view.Yaw = car.Stage == "parked" ? 0f : 90f;
+            }
+
+            float dx = car.X - view.LastX;
+            float dy = car.Y - view.LastY;
+            if (car.Stage == "parked")
+            {
+                view.Yaw = 0f;
+            }
+            else if (dx * dx + dy * dy > 0.4f)
+            {
+                view.Yaw = Mathf.Atan2(dx, dy) * Mathf.Rad2Deg + 90f;
+            }
+
+            view.LastX = car.X;
+            view.LastY = car.Y;
+            view.Root.rotation = Quaternion.Euler(0f, view.Yaw, 0f);
+        }
+
+        CarView BuildGuestCar()
+        {
+            var go = new GameObject("GuestCar");
+            go.transform.SetParent(root, false);
+            var body = MeshObject(
+                "Body",
+                go.transform,
+                cubeMesh,
+                go.transform.position,
+                WorldScale.Size(HotelLayout.ParkedCarWidth, 0.7f, HotelLayout.ParkedCarHeight),
+                Palette.Hex("#4a5a6a"),
+                false);
+            body.transform.localPosition = new Vector3(0f, 0.42f, 0f);
+            var cabin = MeshObject(
+                "Cabin",
+                go.transform,
+                cubeMesh,
+                go.transform.position,
+                WorldScale.Size(22f, 0.45f, 18f),
+                Palette.Hex("#1a2030"),
+                false);
+            cabin.transform.localPosition = new Vector3(-2f / WorldScale.UnitsPerMeter, 0.95f, 0f);
+            return new CarView
+            {
+                Root = go.transform,
+                Body = body.GetComponent<Renderer>(),
+                LastX = float.NaN,
+                LastY = float.NaN,
+                Yaw = 90f
+            };
+        }
+
         void HallRunner(FloorArea area)
         {
             var rect = area.Rect;
@@ -788,12 +885,12 @@ namespace Vacancy
         void BuildParkingLot(Rect lot)
         {
             Box(lotId("Asphalt"), lot, 0.04f, 0.05f, Palette.Hex("#2a2c30"));
-            float driveW = 90f;
+            float driveW = HotelLayout.ParkingDriveWidth;
             float driveX = lot.X + (lot.W - driveW) / 2f;
             Box(lotId("Drive"), new Rect(driveX, lot.Y, driveW, lot.H), 0.055f, 0.03f, Palette.Hex("#3a3d42"));
 
-            float stallH = 54f;
-            float gap = 10f;
+            float stallH = HotelLayout.ParkingStallHeight;
+            float gap = HotelLayout.ParkingStallGap;
             float westW = driveX - lot.X - 14f;
             float eastX = driveX + driveW + 8f;
             float eastW = lot.X + lot.W - eastX - 8f;
@@ -803,22 +900,7 @@ namespace Vacancy
                 float y = lot.Y + 16f + i * (stallH + gap);
                 Box(lotId($"LineW-{i}"), new Rect(lot.X + 8f, y, westW, 2f), 0.07f, 0.02f, Palette.Hex("#c4c0b0"));
                 Box(lotId($"LineE-{i}"), new Rect(eastX, y, eastW, 2f), 0.07f, 0.02f, Palette.Hex("#c4c0b0"));
-                if (i == 0 || i == 2)
-                {
-                    ParkedCar(lotId($"CarW-{i}"), lot.X + 22f, y + stallH * 0.45f, Palette.Hex(i == 0 ? "#4a5a6a" : "#6a3a38"));
-                }
-
-                if (i == 1)
-                {
-                    ParkedCar(lotId($"CarE-{i}"), eastX + 16f, y + stallH * 0.45f, Palette.Hex("#3a4a38"));
-                }
             }
-        }
-
-        void ParkedCar(string name, float x, float y, Color color)
-        {
-            Box(name, new Rect(x, y, 46f, 22f), 0.42f, 0.7f, color);
-            Box(name + "Cabin", new Rect(x + 10f, y + 2f, 22f, 18f), 0.95f, 0.45f, Palette.Hex("#1a2030"));
         }
 
         static string lotId(string name) => "Parking-" + name;
@@ -954,7 +1036,7 @@ namespace Vacancy
                 }
             }
 
-            if (state.WaitingGuests.Count > 0) return "Press E on the phone to check them in";
+            if (Economy.FirstAtDesk(state) != null) return "Press E on the phone to check them in";
             return "Hold RMB to look · WASD walk · E interact · X pin · Esc pause · office door behind the desk to the basement";
         }
 
@@ -1066,6 +1148,15 @@ namespace Vacancy
         {
             public CharacterModel Model;
             public TextMesh Label;
+            public float LastX;
+            public float LastY;
+            public float Yaw;
+        }
+
+        sealed class CarView
+        {
+            public Transform Root;
+            public Renderer Body;
             public float LastX;
             public float LastY;
             public float Yaw;

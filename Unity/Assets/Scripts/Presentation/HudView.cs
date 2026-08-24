@@ -323,7 +323,7 @@ namespace Vacancy
             clock.text = GameState.FormatClock(state.Hour);
             tod.text = GameState.TimeOfDayLabel(state.Hour);
             day.text = $"Day {state.Day}";
-            queue.text = $"Waiting {state.WaitingGuests.Count}";
+            queue.text = $"Waiting {Economy.CountAtDesk(state)}";
             reputation.text = $"Rep {state.Reputation}";
             vacancy.text = state.VacancyOpen ? "VACANCY" : "NO VACANCY";
             radio.text = Media.RadioHudText(state);
@@ -541,7 +541,9 @@ namespace Vacancy
 
         void RefreshPhone()
         {
-            if (state.WaitingGuests.Count == 0)
+            var atDesk = Economy.FirstAtDesk(state);
+            int waiting = Economy.CountAtDesk(state);
+            if (atDesk == null)
             {
                 phoneArrivals.text = "No one is waiting to check in.";
                 phoneReview.interactable = false;
@@ -549,11 +551,10 @@ namespace Vacancy
             }
             else
             {
-                var guest = state.WaitingGuests[0];
-                int extra = state.WaitingGuests.Count - 1;
+                int extra = waiting - 1;
                 phoneArrivals.text = extra > 0
-                    ? $"{guest.Name} is at the desk. {extra} more waiting."
-                    : $"{guest.Name} is at the desk.";
+                    ? $"{atDesk.Name} is at the desk. {extra} more waiting."
+                    : $"{atDesk.Name} is at the desk.";
                 phoneReview.interactable = true;
                 phoneReview.GetComponentInChildren<Text>().text = "Review arrival";
             }

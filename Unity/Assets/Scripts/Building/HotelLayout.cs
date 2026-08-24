@@ -32,6 +32,13 @@ namespace Vacancy
         public Point StairsBottom;
         public NavGrid BasementGrid;
 
+        public const int StallCount = 8;
+        public const float ParkingDriveWidth = 90f;
+        public const float ParkingStallHeight = 54f;
+        public const float ParkingStallGap = 10f;
+        public const float ParkedCarWidth = 46f;
+        public const float ParkedCarHeight = 22f;
+
         readonly Dictionary<string, DepartmentSpot> deptForStaff = new Dictionary<string, DepartmentSpot>();
 
         public static HotelLayout Create(float width = 1360f, float height = 1100f)
@@ -146,6 +153,35 @@ namespace Vacancy
             return new Point(
                 FrontDesk.X - 30 + col * 30,
                 FrontDesk.Y + FrontDesk.H / 2f + 32 + row * 28);
+        }
+
+        public float DriveCenterX => Parking.X + Parking.W / 2f;
+
+        public Point HighwayEntry => new Point(DriveCenterX, Parking.Y + Parking.H + 28f);
+
+        public Point FrontEntrance => new Point(Lobby.X + Lobby.W / 2f, Lobby.Y + Lobby.H + 18f);
+
+        public Point DriveLaneCorner(float carY)
+        {
+            return new Point(DriveCenterX - ParkedCarWidth / 2f, carY);
+        }
+
+        public StallPose StallPose(int index)
+        {
+            int row = index / 2;
+            bool west = index % 2 == 0;
+            float driveX = Parking.X + (Parking.W - ParkingDriveWidth) / 2f;
+            float eastX = driveX + ParkingDriveWidth + 8f;
+            float y = Parking.Y + 16f + row * (ParkingStallHeight + ParkingStallGap);
+            float carX = west ? Parking.X + 22f : eastX + 16f;
+            float carY = y + ParkingStallHeight * 0.45f;
+            float walkX = west ? carX + ParkedCarWidth + 16f : carX - 16f;
+            float walkY = carY + ParkedCarHeight / 2f;
+            return new StallPose
+            {
+                Car = new Point(carX, carY),
+                WalkOut = new Point(walkX, walkY)
+            };
         }
 
         public Point CheckoutLineSlot(int index)
@@ -323,5 +359,11 @@ namespace Vacancy
 
             return problems;
         }
+    }
+
+    public struct StallPose
+    {
+        public Point Car;
+        public Point WalkOut;
     }
 }

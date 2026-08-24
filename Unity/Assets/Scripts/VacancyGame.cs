@@ -151,7 +151,7 @@ namespace Vacancy
         void HandleInteract()
         {
             if (state.PcOpen || player.ActiveTask != null) return;
-            bool phoneQueue = state.WaitingGuests.Count > 0;
+            bool phoneQueue = Economy.FirstAtDesk(state) != null;
             bool deskQueue = false;
             foreach (var guest in state.ActiveGuests)
             {
@@ -425,7 +425,7 @@ namespace Vacancy
 
         public void ReviewArrivalFromPhone()
         {
-            if (state.WaitingGuests.Count == 0) return;
+            if (Economy.FirstAtDesk(state) == null) return;
             state.MediaOpen = null;
             hud.HidePhone();
             OpenDeskReview();
@@ -447,8 +447,9 @@ namespace Vacancy
 
         public void OpenDeskReview()
         {
-            if (state.WaitingGuests.Count == 0) return;
-            state.DeskGuest = state.WaitingGuests[0];
+            var atDesk = Economy.FirstAtDesk(state);
+            if (atDesk == null) return;
+            state.DeskGuest = atDesk;
             state.Paused = true;
         }
 
@@ -470,7 +471,8 @@ namespace Vacancy
         {
             var guest = state.DeskGuest;
             if (guest == null) return;
-            Arrivals.RefuseArrival(state, guest);
+            Arrivals.RefuseArrival(state, guest, layout);
+            Economy.BeginWalkOut(state, layout, guest);
             CloseDeskReview();
         }
 

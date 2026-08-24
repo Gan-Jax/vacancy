@@ -41,7 +41,7 @@ namespace Vacancy
         public string Source;
     }
 
-    public sealed class WaitingGuest
+    public sealed class WaitingGuest : IMover
     {
         public string Name;
         public string Kind = GuestKind.Traveler;
@@ -55,6 +55,28 @@ namespace Vacancy
         public bool Marked;
         public string Tell;
         public readonly List<GuestReply> Replies = new List<GuestReply>();
+        public float X { get; set; }
+        public float Y { get; set; }
+        public float Radius { get; set; } = 11f;
+        public List<Point> Path { get; set; } = new List<Point>();
+        public float StallSeconds { get; set; }
+        public int FloorLevel { get; set; }
+        public float FootY { get; set; }
+        public string ArrivePhase;
+        public int StallIndex = -1;
+        public string CarColor;
+    }
+
+    public sealed class GuestCar
+    {
+        public string Owner;
+        public int StallIndex;
+        public float X;
+        public float Y;
+        public string Color;
+        public string Stage = "inbound";
+        public int Waypoint;
+        public List<Point> Path = new List<Point>();
     }
 
     public sealed class Guest : IMover
@@ -82,6 +104,8 @@ namespace Vacancy
         public float StallSeconds { get; set; }
         public int FloorLevel { get; set; }
         public float FootY { get; set; }
+        public int StallIndex = -1;
+        public string CarColor;
     }
 
     public sealed class GameState
@@ -92,6 +116,7 @@ namespace Vacancy
         public int Reputation;
         public readonly List<WaitingGuest> WaitingGuests = new List<WaitingGuest>();
         public readonly List<Guest> ActiveGuests = new List<Guest>();
+        public readonly List<GuestCar> Cars = new List<GuestCar>();
         public bool VacancyOpen = true;
         public bool Paused;
         public bool PauseMenuOpen;

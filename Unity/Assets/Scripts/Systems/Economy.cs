@@ -65,10 +65,175 @@ namespace Vacancy
             return char.ToUpperInvariant(level[0]) + level.Substring(1);
         }
 
-        public static bool SpawnArrival(GameState state)
+        static readonly string[] CarColors =
+        {
+            "#c45c2a", "#4a6a8a", "#6a3a38", "#3a4a38", "#5b8def", "#8a7355", "#2f6b3a", "#7a5a2a"
+        };
+
+        public static bool IsAtDesk(WaitingGuest guest)
+        {
+            return guest != null && (string.IsNullOrEmpty(guest.ArrivePhase) || guest.ArrivePhase == "waiting");
+        }
+
+        public static WaitingGuest FirstAtDesk(GameState state)
+        {
+            foreach (var guest in state.WaitingGuests)
+            {
+                if (IsAtDesk(guest)) return guest;
+            }
+
+            return null;
+        }
+
+        public static int CountAtDesk(GameState state)
+        {
+            int n = 0;
+            foreach (var guest in state.WaitingGuests)
+            {
+                if (IsAtDesk(guest)) n++;
+            }
+
+            return n;
+        }
+
+        public static int CountInboundWaiting(GameState state)
+        {
+            int n = 0;
+            foreach (var guest in state.WaitingGuests)
+            {
+                string phase = ArrivePhaseOf(guest);
+                if (phase == "driving" || phase == "walking_in" || phase == "waiting") n++;
+            }
+
+            return n;
+        }
+
+        static string ArrivePhaseOf(WaitingGuest guest)
+        {
+            if (guest == null || string.IsNullOrEmpty(guest.ArrivePhase)) return "waiting";
+            return guest.ArrivePhase;
+        }
+
+        static int FindFreeStall(GameState state)
+        {
+            var used = new bool[HotelLayout.StallCount];
+            void Occupy(int index)
+            {
+                if (index >= 0 && index < used.Length) used[index] = true;
+            }
+
+            foreach (var guest in state.WaitingGuests) Occupy(guest.StallIndex);
+            foreach (var guest in state.ActiveGuests) Occupy(guest.StallIndex);
+            foreach (var car in state.Cars) Occupy(car.StallIndex);
+
+            for (int i = 0; i < used.Length; i++)
+            {
+                if (!used[i]) return i;
+            }
+
+            return -1;
+        }
+
+        static GuestCar FindCar(GameState state, WaitingGuest guest)
+        {
+            if (guest == null) return null;
+            foreach (var car in state.Cars)
+            {
+                if (guest.StallIndex >= 0 && car.StallIndex == guest.StallIndex) return car;
+            }
+
+            if (string.IsNullOrEmpty(guest.Name)) return null;
+            foreach (var car in state.Cars)
+            {
+                if (car.Owner == guest.Name) return car;
+            }
+
+            return null;
+        }
+
+        static void RemoveCar(GameState state, WaitingGuest guest)
+        {
+            for (int i = state.Cars.Count - 1; i >= 0; i--)
+            {
+                var car = state.Cars[i];
+                bool match = guest != null && guest.StallIndex >= 0 && car.StallIndex == guest.StallIndex;
+                if (!match && guest != null && !string.IsNullOrEmpty(guest.Name) && car.Owner == guest.Name)
+                {
+                    match = true;
+                }
+
+                if (match) state.Cars.RemoveAt(i);
+            }
+        }
+
+        static PathOptions LobbyWalkOptions(GameState state, WaitingGuest guest)
+        {
+            return new PathOptions
+            {
+                Rooms = state.Rooms,
+                Radius = guest != null ? guest.Radius : 11f,
+                FromFloor = guest?.FloorLevel ?? 0,
+                ToFloor = 0
+            };
+        }
+
+        static List<Point> PathViaEntrance(GameState state, HotelLayout layout, WaitingGuest guest, Point dest)
+        {
+            var options = LobbyWalkOptions(state, guest);
+            var entrance = layout.FrontEntrance;
+            var first = Pathing.FindPath(layout, guest.X, guest.Y, entrance, options);
+            var second = Pathing.FindPath(layout, entrance.X, entrance.Y, dest, options);
+            var combined = new List<Point>(first.Count + second.Count);
+            combined.AddRange(first);
+            combined.AddRange(second);
+            if (combined.Count == 0) combined.Add(dest);
+            return combined;
+        }
+
+        static bool FollowDrive(GuestCar car, float dt, float speed)
+        {
+            if (car?.Path == null || car.Path.Count == 0) return true;
+            if (car.Waypoint >= car.Path.Count) return true;
+
+            var target = car.Path[car.Waypoint];
+            float dist = Geometry.Dist(car.X, car.Y, target.X, target.Y);
+            if (dist < 4f)
+            {
+                car.X = target.X;
+                car.Y = target.Y;
+                car.Waypoint++;
+                return car.Waypoint >= car.Path.Count;
+            }
+
+            float travel = Math.Min(speed * dt, dist);
+            car.X += (target.X - car.X) / dist * travel;
+            car.Y += (target.Y - car.Y) / dist * travel;
+            return false;
+        }
+
+        public static void BeginWalkOut(GameState state, HotelLayout layout, WaitingGuest guest)
+        {
+            if (guest == null) return;
+            guest.ArrivePhase = "walking_out";
+            guest.Path = new List<Point>();
+            if (layout == null || guest.StallIndex < 0) return;
+            guest.Path = PathViaEntrance(state, layout, guest, layout.StallPose(guest.StallIndex).WalkOut);
+        }
+
+        static void LogDeskArrival(GameState state, WaitingGuest guest)
+        {
+            state.AddLog($"{guest.Name} is at the desk. {guest.Claim}");
+            foreach (var sign in Arrivals.RevealedSigns(guest))
+            {
+                state.AddLog(sign.Text);
+            }
+        }
+
+        public static bool SpawnArrival(GameState state, HotelLayout layout)
         {
             if (!state.VacancyOpen) return false;
-            if (state.WaitingGuests.Count >= GameConfig.MaxWaitingGuests) return false;
+            if (layout == null || layout.Parking.W <= 0f) return false;
+            if (CountInboundWaiting(state) >= GameConfig.MaxWaitingGuests) return false;
 
             int cleanRooms = 0;
             foreach (var room in state.Rooms)
@@ -76,17 +241,175 @@ namespace Vacancy
                 if (room.Unlocked && room.Status == "clean") cleanRooms++;
             }
 
-            if (cleanRooms <= state.WaitingGuests.Count) return false;
+            if (cleanRooms <= CountInboundWaiting(state)) return false;
+
+            int stall = FindFreeStall(state);
+            if (stall < 0) return false;
+
+            var pose = layout.StallPose(stall);
+            var highway = layout.HighwayEntry;
+            var start = layout.DriveLaneCorner(highway.Y);
+            string color = CarColors[GameRng.NextInt(0, CarColors.Length - 1)];
 
             var guest = Arrivals.CreateArrival(state, PickGuestName());
+            guest.ArrivePhase = "driving";
+            guest.StallIndex = stall;
+            guest.CarColor = color;
+            guest.FloorLevel = 0;
+            guest.X = start.X;
+            guest.Y = start.Y;
+            guest.Path = new List<Point>();
             state.WaitingGuests.Add(guest);
-            state.AddLog($"{guest.Name} is at the desk. {guest.Claim}");
-            foreach (var sign in Arrivals.RevealedSigns(guest))
+            state.Cars.Add(new GuestCar
             {
-                state.AddLog(sign.Text);
+                Owner = guest.Name,
+                StallIndex = stall,
+                X = start.X,
+                Y = start.Y,
+                Color = color,
+                Stage = "inbound",
+                Waypoint = 0,
+                Path = new List<Point>
+                {
+                    layout.DriveLaneCorner(pose.Car.Y),
+                    pose.Car
+                }
+            });
+            state.AddLog($"{guest.Name} is driving in from the highway.");
+            return true;
+        }
+
+        public static void UpdateArrivals(GameState state, float dt, HotelLayout layout)
+        {
+            if (layout == null) return;
+            float speed = GameConfig.GuestMoveSpeed;
+            float carSpeed = speed * 2.2f;
+            var leaving = new List<WaitingGuest>();
+            int deskIndex = 0;
+
+            foreach (var guest in state.WaitingGuests)
+            {
+                string phase = ArrivePhaseOf(guest);
+                var car = FindCar(state, guest);
+
+                if (phase == "driving")
+                {
+                    bool parked = car == null || FollowDrive(car, dt, carSpeed);
+                    if (parked)
+                    {
+                        var pose = layout.StallPose(guest.StallIndex);
+                        if (car != null)
+                        {
+                            car.Stage = "parked";
+                            car.X = pose.Car.X;
+                            car.Y = pose.Car.Y;
+                            car.Path.Clear();
+                            car.Waypoint = 0;
+                        }
+
+                        guest.ArrivePhase = "walking_in";
+                        guest.X = pose.WalkOut.X;
+                        guest.Y = pose.WalkOut.Y;
+                        guest.FloorLevel = 0;
+                        var slot = layout.CheckInLineSlot(CountAtDesk(state));
+                        guest.Path = PathViaEntrance(state, layout, guest, slot);
+                    }
+                    else
+                    {
+                        guest.X = car.X;
+                        guest.Y = car.Y;
+                    }
+
+                    continue;
+                }
+
+                if (phase == "walking_in")
+                {
+                    if (guest.Path == null || guest.Path.Count == 0)
+                    {
+                        var slot = layout.CheckInLineSlot(CountAtDesk(state));
+                        guest.Path = PathViaEntrance(state, layout, guest, slot);
+                    }
+
+                    if (Pathing.FollowPath(guest, dt, state.Rooms, layout, null, speed))
+                    {
+                        guest.ArrivePhase = "waiting";
+                        guest.Path.Clear();
+                        LogDeskArrival(state, guest);
+                    }
+
+                    continue;
+                }
+
+                if (phase == "waiting")
+                {
+                    var slot = layout.CheckInLineSlot(deskIndex++);
+                    guest.X = slot.X;
+                    guest.Y = slot.Y;
+                    continue;
+                }
+
+                if (phase == "walking_out")
+                {
+                    if (guest.StallIndex < 0)
+                    {
+                        leaving.Add(guest);
+                        continue;
+                    }
+
+                    var walk = layout.StallPose(guest.StallIndex).WalkOut;
+                    if (guest.Path == null || guest.Path.Count == 0)
+                    {
+                        guest.Path = PathViaEntrance(state, layout, guest, walk);
+                    }
+
+                    bool arrived = Pathing.FollowPath(guest, dt, state.Rooms, layout, null, speed)
+                                   || Geometry.Dist(guest.X, guest.Y, walk.X, walk.Y) < 12f;
+                    if (arrived)
+                    {
+                        guest.ArrivePhase = "driving_away";
+                        guest.X = walk.X;
+                        guest.Y = walk.Y;
+                        guest.Path.Clear();
+                        var pose = layout.StallPose(guest.StallIndex);
+                        if (car != null)
+                        {
+                            car.Stage = "outbound";
+                            car.X = pose.Car.X;
+                            car.Y = pose.Car.Y;
+                            car.Waypoint = 0;
+                            car.Path = new List<Point>
+                            {
+                                layout.DriveLaneCorner(pose.Car.Y),
+                                layout.DriveLaneCorner(layout.HighwayEntry.Y)
+                            };
+                        }
+                    }
+
+                    continue;
+                }
+
+                if (phase == "driving_away")
+                {
+                    bool gone = car == null || FollowDrive(car, dt, carSpeed);
+                    if (!gone && car != null && car.Y >= layout.HighwayEntry.Y - 4f) gone = true;
+                    if (gone)
+                    {
+                        leaving.Add(guest);
+                    }
+                    else
+                    {
+                        guest.X = car.X;
+                        guest.Y = car.Y;
+                    }
+                }
             }
 
-            return true;
+            foreach (var guest in leaving)
+            {
+                state.WaitingGuests.Remove(guest);
+                RemoveCar(state, guest);
+            }
         }
 
         public static void ProcessWaitingGuests(GameState state, float hoursPassed)
@@ -113,13 +436,13 @@ namespace Vacancy
 
         public static bool CheckInAtDesk(GameState state, HotelLayout layout, WaitingGuest chosenGuest = null)
         {
-            if (state.WaitingGuests.Count == 0)
+            if (chosenGuest != null && !state.WaitingGuests.Contains(chosenGuest)) return false;
+            var waiting = chosenGuest ?? FirstAtDesk(state);
+            if (waiting == null || !IsAtDesk(waiting))
             {
                 state.AddLog("Nobody is waiting to check in.");
                 return false;
             }
-
-            if (chosenGuest != null && !state.WaitingGuests.Contains(chosenGuest)) return false;
 
             Room cleanRoom = null;
             foreach (var room in state.Rooms)
@@ -146,9 +469,8 @@ namespace Vacancy
 
             int stayDays = GameConfig.MinStayDays +
                            GameRng.NextInt(0, GameConfig.MaxStayDays - GameConfig.MinStayDays);
-            var waiting = chosenGuest ?? state.WaitingGuests[0];
             state.WaitingGuests.Remove(waiting);
-            var spawn = layout.CheckInLineSlot(0);
+            var spawn = new Point(waiting.X, waiting.Y);
             var dest = layout.RoomInterior(cleanRoom.Id);
 
             InventorySystem.ConsumeCheckInSupplies(state, cleanRoom);
@@ -183,7 +505,9 @@ namespace Vacancy
                 StayRemainingHours = stayDays * GameConfig.StayIntervalHours,
                 PaymentsLeft = stayDays - 1,
                 NextIntervalPaymentIn = GameConfig.StayIntervalHours,
-                HasHiddenDamage = cleanRoom.HasHiddenDamage
+                HasHiddenDamage = cleanRoom.HasHiddenDamage,
+                StallIndex = waiting.StallIndex,
+                CarColor = waiting.CarColor
             });
 
             string dayWord = stayDays == 1 ? "day" : "days";
@@ -211,7 +535,7 @@ namespace Vacancy
             return true;
         }
 
-        public static bool CheckOutAtDesk(GameState state)
+        public static bool CheckOutAtDesk(GameState state, HotelLayout layout)
         {
             Guest guest = null;
             foreach (var g in state.ActiveGuests)
@@ -243,6 +567,21 @@ namespace Vacancy
                 state.AddLog($"{guest.Name} checked out happily. (+{bonus} reputation)");
             }
 
+            var departing = new WaitingGuest
+            {
+                Name = guest.Name,
+                Kind = guest.Kind ?? GuestKind.Traveler,
+                StallIndex = guest.StallIndex,
+                CarColor = guest.CarColor,
+                ArrivePhase = "walking_out",
+                X = guest.X,
+                Y = guest.Y,
+                Radius = guest.Radius,
+                FloorLevel = guest.FloorLevel,
+                FootY = guest.FootY
+            };
+            state.WaitingGuests.Add(departing);
+            BeginWalkOut(state, layout, departing);
             state.ActiveGuests.Remove(guest);
             Story.Hook(state, "checkOut", null, guest);
             return true;
@@ -288,7 +627,7 @@ namespace Vacancy
             {
                 if (guest.Phase == "waiting_checkout")
                 {
-                    CheckOutAtDesk(state);
+                    CheckOutAtDesk(state, layout);
                     return "checkout";
                 }
             }
@@ -302,7 +641,7 @@ namespace Vacancy
                 }
             }
 
-            if (state.WaitingGuests.Count > 0)
+            if (FirstAtDesk(state) != null)
             {
                 state.AddLog("Arrivals wait on the desk phone.");
                 return "phone";
@@ -624,10 +963,11 @@ namespace Vacancy
             InventorySystem.UpdateOrders(state, hoursPassed);
             UpdateGuests(state, dt, layout);
             ProcessWaitingGuests(state, hoursPassed);
+            UpdateArrivals(state, dt, layout);
 
             if (GameRng.NextFloat() < GetArrivalChancePerSecond(state) * dt)
             {
-                SpawnArrival(state);
+                SpawnArrival(state, layout);
             }
         }
 

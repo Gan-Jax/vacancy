@@ -439,10 +439,11 @@ namespace Vacancy
             return true;
         }
 
-        public static bool RefuseArrival(GameState state, WaitingGuest guest)
+        public static bool RefuseArrival(GameState state, WaitingGuest guest, HotelLayout layout = null)
         {
             if (guest == null) return false;
-            state.WaitingGuests.Remove(guest);
+            guest.ArrivePhase = "walking_out";
+            guest.Path = new List<Point>();
 
             var story = state.Story;
             if (guest.Kind == GuestKind.Traveler)
