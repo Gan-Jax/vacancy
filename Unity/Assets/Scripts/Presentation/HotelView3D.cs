@@ -174,7 +174,13 @@ namespace Vacancy
                 }
                 else if (area.Kind == AreaKind.Lobby)
                 {
-                    Box(area.Id + "-floor", Inset(area.Rect, layout.Tile), 0.05f, 0.08f, Palette.LobbyFloor);
+                    SlabWithHole(
+                        area.Id + "-floor",
+                        Inset(area.Rect, layout.Tile),
+                        layout.Stairs,
+                        0.05f,
+                        0.08f,
+                        Palette.LobbyFloor);
                     Walls(area.Id, area.Rect, area.Doors, Palette.LobbyWall);
                 }
                 else if (area.Kind == AreaKind.Office)

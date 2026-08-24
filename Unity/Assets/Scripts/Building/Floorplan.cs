@@ -189,10 +189,14 @@ namespace Vacancy
         {
             float tile = floor.Tile;
             float Down(float value) => (float)(System.Math.Floor(value / tile) * tile);
-            float y = building.Y + building.H;
-            float h = Down(lotHeight - y);
+            // Meet the last interior band so the lot is not sealed behind the
+            // 20-unit building edge (that strip was never stamped walkable).
+            float joinY = floor.Content.H > 0f
+                ? Down(floor.Content.Y + floor.Content.H - tile)
+                : building.Y + building.H;
+            float h = Down(lotHeight - joinY);
             if (h < tile * 8f) h = tile * 20f;
-            var parking = new Rect(building.X, y, building.W, h);
+            var parking = new Rect(building.X, joinY, building.W, h);
             floor.Areas.Add(new FloorArea
             {
                 Id = "parking",
@@ -201,7 +205,8 @@ namespace Vacancy
                 Rect = parking
             });
             floor.Parking = parking;
-            floor.Bounds = new Rect(building.X, building.Y, building.W, building.H + parking.H);
+            float south = System.Math.Max(building.Y + building.H, parking.Y + parking.H);
+            floor.Bounds = new Rect(building.X, building.Y, building.W, Down(south - building.Y));
             return parking;
         }
 
