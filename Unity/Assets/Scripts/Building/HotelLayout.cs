@@ -47,10 +47,10 @@ namespace Vacancy
                 Office = floor.Office,
                 FrontDesk = desk,
                 Departments = floor.Departments,
-                LobbyRadio = new DeskSpot { X = desk.X - 110f, Y = desk.Y - 8f, W = 36, H = 28 },
-                Newspaper = new DeskSpot { X = desk.X - 38f, Y = desk.Y + 4f, W = 28, H = 18 },
+                LobbyRadio = new DeskSpot { X = desk.X - desk.W / 2f + 22f, Y = desk.Y - 4f, W = 36, H = 28 },
+                Newspaper = new DeskSpot { X = desk.X + 16f, Y = desk.Y + 2f, W = 28, H = 18 },
                 VacancySign = new DeskSpot { X = width / 2f, Y = height - 28f, W = 140, H = 36 },
-                Spawn = new Point(desk.X, desk.Y + 40)
+                Spawn = new Point(desk.X + 50f, desk.Y + 70f)
             };
 
             foreach (var room in floor.Rooms) layout.RoomCenters.Add(room.Center);
@@ -90,7 +90,7 @@ namespace Vacancy
 
         public Point DeskApproach()
         {
-            return new Point(FrontDesk.X, FrontDesk.Y + 46);
+            return new Point(FrontDesk.X, FrontDesk.Y + FrontDesk.H / 2f + 36f);
         }
 
         public Point StaffHome(string key)
@@ -110,7 +110,11 @@ namespace Vacancy
 
         public Point CheckInLineSlot(int index)
         {
-            return new Point(FrontDesk.X + 96 + index * 40, FrontDesk.Y + 30);
+            int col = index % 3;
+            int row = index / 3;
+            return new Point(
+                FrontDesk.X - 30 + col * 30,
+                FrontDesk.Y + FrontDesk.H / 2f + 32 + row * 28);
         }
 
         public Point CheckoutLineSlot(int index)
@@ -118,13 +122,15 @@ namespace Vacancy
             const int perRow = 8;
             int col = index % perRow;
             int row = System.Math.Min(1, index / perRow);
-            return new Point(FrontDesk.X - 96 - col * 38, FrontDesk.Y + 24 + row * 26);
+            return new Point(
+                FrontDesk.X - FrontDesk.W / 2f - 36 - col * 38,
+                FrontDesk.Y + 20 + row * 26);
         }
 
         public Point StaffPaySlot(string staffId)
         {
             float offset = staffId == "mary" ? 46 : 0;
-            return new Point(FrontDesk.X - 30 + offset, FrontDesk.Y - 40);
+            return new Point(FrontDesk.X - 30 + offset, FrontDesk.Y - FrontDesk.H / 2f - 22);
         }
 
         public List<string> Validate()

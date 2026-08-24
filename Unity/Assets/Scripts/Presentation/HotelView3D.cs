@@ -188,33 +188,35 @@ namespace Vacancy
                 Palette.Paper);
 
             var lobby = layout.Lobby;
-            float sitX = lobby.Center.X + 20f;
-            float sitY = lobby.Y + lobby.H * 0.62f;
-            Box("Rug", new Rect(sitX - 130, sitY - 70, 260, 140), 0.055f, 0.02f, Palette.Hex("#4a2f2a"));
-            Box("CouchSouth", new Rect(sitX - 80, sitY + 36, 160, 32), 0.28f, 0.42f, Palette.Hex("#5c4a3a"));
-            Box("CouchNorth", new Rect(sitX - 80, sitY - 64, 160, 32), 0.28f, 0.42f, Palette.Hex("#5c4a3a"));
-            Box("CoffeeTable", new Rect(sitX - 36, sitY - 18, 72, 36), 0.32f, 0.28f, Palette.Hex("#3a2a20"));
+            float sitX = desk.X;
+            float sitY = desk.Y + 100f;
+            Box("Rug", new Rect(sitX - 90, sitY - 50, 180, 100), 0.055f, 0.02f, Palette.Hex("#4a2f2a"));
+            Box("ChairWest", new Rect(sitX - 72, sitY - 28, 28, 56), 0.28f, 0.42f, Palette.Hex("#5c4a3a"));
+            Box("ChairEast", new Rect(sitX + 44, sitY - 28, 28, 56), 0.28f, 0.42f, Palette.Hex("#5c4a3a"));
+            Box("CoffeeTable", new Rect(sitX - 18, sitY - 18, 36, 36), 0.32f, 0.28f, Palette.Hex("#3a2a20"));
             Box("PlantSW", new Rect(lobby.X + 24, lobby.Y + lobby.H - 56, 22, 22), 0.55f, 1f, Palette.Hex("#2f5a3a"));
             Box("PlantSE", new Rect(lobby.X + lobby.W - 46, lobby.Y + lobby.H - 56, 22, 22), 0.55f, 1f, Palette.Hex("#2f5a3a"));
 
             if (layout.Office != null)
             {
                 var office = layout.Office.Rect;
+                float pcX = office.X + office.W * 0.72f;
+                float pcY = office.Center.Y;
                 Box(
                     "PcDesk",
-                    new Rect(office.Center.X - 28, office.Center.Y - 18, 56, 36),
+                    new Rect(pcX - 28, pcY - 18, 56, 36),
                     0.45f,
                     0.9f,
                     Palette.Hex("#2a3142"));
                 Box(
                     "Pc",
-                    new Rect(office.Center.X - 16, office.Center.Y - 8, 32, 16),
+                    new Rect(pcX - 16, pcY - 8, 32, 16),
                     1.05f,
                     0.35f,
                     Palette.Hex("#1a2030"));
                 Box(
                     "PcScreen",
-                    new Rect(office.Center.X - 12, office.Center.Y - 5, 24, 6),
+                    new Rect(pcX - 12, pcY - 5, 24, 6),
                     1.28f,
                     0.22f,
                     Palette.Hex("#7dffb2"));
@@ -255,8 +257,12 @@ namespace Vacancy
             sun.shadows = LightShadows.None;
 
             PointLight("LobbyLight", layout.Lobby.Center.X, layout.Lobby.Center.Y, 2.4f, 14f, 1.5f, new Color(1f, 0.86f, 0.7f));
-            PointLight("SeatingLight", layout.Lobby.Center.X + 20f, layout.Lobby.Y + layout.Lobby.H * 0.62f, 2.2f, 10f, 1.1f, new Color(1f, 0.82f, 0.62f));
+            PointLight("SeatingLight", layout.FrontDesk.X, layout.FrontDesk.Y + 100f, 2.2f, 10f, 1.1f, new Color(1f, 0.82f, 0.62f));
             PointLight("DeskLight", layout.FrontDesk.X, layout.FrontDesk.Y, 2.2f, 9f, 1.2f, new Color(1f, 0.9f, 0.75f));
+            if (layout.Office != null)
+            {
+                PointLight("OfficeLight", layout.Office.X, layout.Office.Y, 2.1f, 8f, 1.05f, new Color(0.7f, 0.95f, 0.85f));
+            }
 
             int corridorLights = 0;
             foreach (var area in layout.Floor.Areas)

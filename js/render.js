@@ -88,14 +88,14 @@ export function createLayout(canvas) {
   };
 
   const lobbyRadio = {
-    x: desk.x - 110,
-    y: desk.y - 8,
+    x: desk.x - desk.w / 2 + 22,
+    y: desk.y - 4,
     w: 36,
     h: 28,
   };
   const newspaper = {
-    x: desk.x - 38,
-    y: desk.y + 4,
+    x: desk.x + 16,
+    y: desk.y + 2,
     w: 28,
     h: 18,
   };
@@ -120,7 +120,7 @@ export function createLayout(canvas) {
     lobbyRadio,
     newspaper,
     vacancySign: { x: width / 2, y: height - 28, w: 140, h: 36 },
-    spawn: { x: desk.x, y: desk.y + 40 },
+    spawn: { x: desk.x + 50, y: desk.y + 70 },
 
     /** Public spot just outside a guest room's door. */
     roomDoor(roomId) {
@@ -137,26 +137,32 @@ export function createLayout(canvas) {
     },
     /** Where characters queue up to reach the desk. */
     deskApproach() {
-      return { x: desk.x, y: desk.y + 46 };
+      return { x: desk.x, y: desk.y + desk.h / 2 + 36 };
     },
     staffHome(key) {
       const dept = deptForStaff[key] ?? maintenance;
       return { x: dept.x, y: dept.y };
     },
     checkInLineSlot(index) {
-      return { x: desk.x + 96 + index * 40, y: desk.y + 30 };
+      const col = index % 3;
+      const row = Math.floor(index / 3);
+      return {
+        x: desk.x - 30 + col * 30,
+        y: desk.y + desk.h / 2 + 32 + row * 28,
+      };
     },
     checkoutLineSlot(index) {
-      // Wrap the queue into two rows so a full house never spills into the
-      // office or through the lobby's south wall.
       const perRow = 8;
       const col = index % perRow;
       const row = Math.min(1, Math.floor(index / perRow));
-      return { x: desk.x - 96 - col * 38, y: desk.y + 24 + row * 26 };
+      return {
+        x: desk.x - desk.w / 2 - 36 - col * 38,
+        y: desk.y + 20 + row * 26,
+      };
     },
     staffPaySlot(staffId) {
       const offset = staffId === "mary" ? 46 : 0;
-      return { x: desk.x - 30 + offset, y: desk.y - 40 };
+      return { x: desk.x - 30 + offset, y: desk.y - desk.h / 2 - 22 };
     },
     /** Startup self-check that the generated floor is actually walkable. */
     validate() {
@@ -362,7 +368,7 @@ export function drawWorld(ctx, state, layout, player, staffList = []) {
       ctx.fillStyle = "#dbc5a2";
       ctx.font = "bold 14px Segoe UI";
       ctx.fillText("Lobby", area.rect.x + 16, area.rect.y + 26);
-      drawLobbySeating(ctx, area.rect);
+      drawLobbySeating(ctx, area.rect, layout.frontDesk);
     } else if (area.kind === AREA.OFFICE) {
       drawWalledArea(ctx, area, tile, COLORS.officeWall, COLORS.officeFloor);
       drawOfficeFittings(ctx, area);
@@ -497,19 +503,17 @@ function drawDoorGap(ctx, area, door, tile) {
 }
 
 function drawOfficeFittings(ctx, area) {
-  const center = {
-    x: area.rect.x + area.rect.w / 2,
-    y: area.rect.y + area.rect.h / 2,
-  };
+  const pcX = area.rect.x + area.rect.w * 0.72;
+  const pcY = area.rect.y + area.rect.h / 2;
   ctx.fillStyle = "#1a2030";
-  ctx.fillRect(center.x - 24, center.y - 20, 48, 32);
+  ctx.fillRect(pcX - 24, pcY - 20, 48, 32);
   ctx.fillStyle = "#7dffb2";
-  ctx.fillRect(center.x - 20, center.y - 16, 40, 24);
+  ctx.fillRect(pcX - 20, pcY - 16, 40, 24);
   ctx.fillStyle = "#dbc5a2";
   ctx.font = "12px Segoe UI";
   ctx.fillText("Office", area.rect.x + 16, area.rect.y + 26);
   ctx.font = "10px Segoe UI";
-  ctx.fillText("PC", center.x - 7, center.y + 26);
+  ctx.fillText("PC", pcX - 7, pcY + 26);
 }
 
 function drawDepartment(ctx, area) {
@@ -524,16 +528,16 @@ function drawDepartment(ctx, area) {
   ctx.fillText(area.label, r.x + 10, r.y + 20);
 }
 
-function drawLobbySeating(ctx, lobby) {
-  const sitX = lobby.x + lobby.w / 2 + 20;
-  const sitY = lobby.y + lobby.h * 0.62;
+function drawLobbySeating(ctx, lobby, desk) {
+  const sitX = desk?.x ?? lobby.x + lobby.w / 2;
+  const sitY = desk ? desk.y + 100 : lobby.y + lobby.h * 0.62;
   ctx.fillStyle = "#4a2f2a";
-  ctx.fillRect(sitX - 130, sitY - 70, 260, 140);
+  ctx.fillRect(sitX - 90, sitY - 50, 180, 100);
   ctx.fillStyle = "#5c4a3a";
-  ctx.fillRect(sitX - 80, sitY + 36, 160, 32);
-  ctx.fillRect(sitX - 80, sitY - 64, 160, 32);
+  ctx.fillRect(sitX - 72, sitY - 28, 28, 56);
+  ctx.fillRect(sitX + 44, sitY - 28, 28, 56);
   ctx.fillStyle = "#3a2a20";
-  ctx.fillRect(sitX - 36, sitY - 18, 72, 36);
+  ctx.fillRect(sitX - 18, sitY - 18, 36, 36);
 }
 
 function drawFrontDesk(ctx, desk) {

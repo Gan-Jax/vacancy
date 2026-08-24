@@ -252,6 +252,10 @@ namespace Vacancy
                 {
                     var lobbyRect = new Rect(roomsBlockX, cursorY, roomsBlockW, height);
                     floor.Lobby = lobbyRect;
+                    // Reception reads south→north the way a guest walks in from
+                    // the lot: double doors, waiting chairs, front desk, then
+                    // the office (PC behind the counter). Flanking passages
+                    // lead to the guest-room corridors.
                     floor.Areas.Add(new FloorArea
                     {
                         Id = "lobby",
@@ -261,21 +265,22 @@ namespace Vacancy
                         Walls = true,
                         Doors = new List<Door>
                         {
-                            MakeDoor(lobbyRect, "north", spec.DoorWidth, 0.24f, tile),
-                            MakeDoor(lobbyRect, "north", spec.DoorWidth, 0.76f, tile),
-                            MakeDoor(lobbyRect, "south", spec.DoorWidth, 0.24f, tile),
-                            MakeDoor(lobbyRect, "south", spec.DoorWidth, 0.76f, tile),
-                            MakeDoor(lobbyRect, "west", spec.DoorWidth, 0.5f, tile),
-                            MakeDoor(lobbyRect, "east", spec.DoorWidth, 0.5f, tile)
+                            MakeDoor(lobbyRect, "north", spec.DoorWidth, 0.14f, tile),
+                            MakeDoor(lobbyRect, "north", spec.DoorWidth, 0.86f, tile),
+                            MakeDoor(lobbyRect, "south", spec.DoorWidth * 2f, 0.5f, tile),
+                            MakeDoor(lobbyRect, "west", spec.DoorWidth, 0.72f, tile),
+                            MakeDoor(lobbyRect, "east", spec.DoorWidth, 0.72f, tile)
                         }
                     });
 
+                    float officeW = Down(300);
+                    float officeH = Down(100);
                     var officeRect = new Rect(
-                        lobbyRect.X + Down(20),
+                        lobbyRect.X + Down((lobbyRect.W - officeW) / 2f),
                         lobbyRect.Y + Down(20),
-                        Down(140),
-                        Down(120));
-                    var officeDoor = MakeDoor(officeRect, "east", spec.DoorWidth, 0.5f, tile);
+                        officeW,
+                        officeH);
+                    var officeDoor = MakeDoor(officeRect, "south", spec.DoorWidth, 0.5f, tile);
                     floor.Areas.Add(new FloorArea
                     {
                         Id = "office",
@@ -298,12 +303,14 @@ namespace Vacancy
                         Approach = OutsidePoint(officeDoor, tile)
                     };
 
+                    float deskH = Down(40);
+                    float staffAlley = Down(60);
                     floor.FrontDesk = new DeskSpot
                     {
-                        X = lobbyRect.X + lobbyRect.W * 0.62f,
-                        Y = lobbyRect.Y + Down(48),
-                        W = 160,
-                        H = 50
+                        X = officeRect.X + officeRect.W / 2f,
+                        Y = officeRect.Y + officeRect.H + staffAlley + deskH / 2f,
+                        W = Down(320),
+                        H = deskH
                     };
 
                     PushSideCorridors(floor.Areas, content, bandRect, roomsBlockX, roomsBlockW);

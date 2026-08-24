@@ -166,6 +166,9 @@ export function createFloor(spec, bounds) {
       };
       lobby = lobbyRect;
 
+      // Reception reads south→north the way a guest walks in from the lot:
+      // double doors, waiting chairs, front desk, then the office (PC behind
+      // the counter). Passages on both flanks lead to the guest-room corridors.
       areas.push({
         id: "lobby",
         kind: AREA.LOBBY,
@@ -174,22 +177,23 @@ export function createFloor(spec, bounds) {
         rect: lobbyRect,
         walls: true,
         doors: [
-          makeDoor(lobbyRect, "north", spec.doorWidth, 0.24, tile),
-          makeDoor(lobbyRect, "north", spec.doorWidth, 0.76, tile),
-          makeDoor(lobbyRect, "south", spec.doorWidth, 0.24, tile),
-          makeDoor(lobbyRect, "south", spec.doorWidth, 0.76, tile),
-          makeDoor(lobbyRect, "west", spec.doorWidth, 0.5, tile),
-          makeDoor(lobbyRect, "east", spec.doorWidth, 0.5, tile),
+          makeDoor(lobbyRect, "north", spec.doorWidth, 0.14, tile),
+          makeDoor(lobbyRect, "north", spec.doorWidth, 0.86, tile),
+          makeDoor(lobbyRect, "south", spec.doorWidth * 2, 0.5, tile),
+          makeDoor(lobbyRect, "west", spec.doorWidth, 0.72, tile),
+          makeDoor(lobbyRect, "east", spec.doorWidth, 0.72, tile),
         ],
       });
 
+      const officeW = down(300);
+      const officeH = down(100);
       const officeRect = {
-        x: lobbyRect.x + down(20),
+        x: lobbyRect.x + down((lobbyRect.w - officeW) / 2),
         y: lobbyRect.y + down(20),
-        w: down(140),
-        h: down(120),
+        w: officeW,
+        h: officeH,
       };
-      const officeDoor = makeDoor(officeRect, "east", spec.doorWidth, 0.5, tile);
+      const officeDoor = makeDoor(officeRect, "south", spec.doorWidth, 0.5, tile);
       areas.push({
         id: "office",
         kind: AREA.OFFICE,
@@ -208,11 +212,13 @@ export function createFloor(spec, bounds) {
         approach: outsidePoint(officeDoor, tile),
       };
 
+      const deskH = down(40);
+      const staffAlley = down(60);
       frontDesk = {
-        x: lobbyRect.x + lobbyRect.w * 0.62,
-        y: lobbyRect.y + down(48),
-        w: 160,
-        h: 50,
+        x: officeRect.x + officeRect.w / 2,
+        y: officeRect.y + officeRect.h + staffAlley + deskH / 2,
+        w: down(320),
+        h: deskH,
       };
 
       pushSideCorridors(areas, content, bandRect, roomsBlockX, roomsBlockW);

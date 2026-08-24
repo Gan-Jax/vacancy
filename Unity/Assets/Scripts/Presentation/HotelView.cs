@@ -50,8 +50,10 @@ namespace Vacancy
                 else if (area.Kind == AreaKind.Office)
                 {
                     DrawWalled(area, Palette.OfficeWall, Palette.OfficeFloor);
-                    Quad("Pc", new Rect(area.Rect.Center.X - 24, area.Rect.Center.Y - 20, 48, 32), Palette.Hex("#1a2030"), 3);
-                    Quad("PcScreen", new Rect(area.Rect.Center.X - 20, area.Rect.Center.Y - 16, 40, 24), Palette.Hex("#7dffb2"), 4);
+                    float pcX = area.Rect.X + area.Rect.W * 0.72f;
+                    float pcY = area.Rect.Center.Y;
+                    Quad("Pc", new Rect(pcX - 24, pcY - 20, 48, 32), Palette.Hex("#1a2030"), 3);
+                    Quad("PcScreen", new Rect(pcX - 20, pcY - 16, 40, 24), Palette.Hex("#7dffb2"), 4);
                     Label("Office", area.Rect.X + 16, area.Rect.Y + 14, Palette.Hex("#dbc5a2"), 12);
                 }
                 else if (area.Kind == AreaKind.Department)
