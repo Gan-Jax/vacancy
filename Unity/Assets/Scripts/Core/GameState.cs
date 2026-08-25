@@ -122,7 +122,7 @@ namespace Vacancy
         public readonly List<WaitingGuest> WaitingGuests = new List<WaitingGuest>();
         public readonly List<Guest> ActiveGuests = new List<Guest>();
         public readonly List<GuestCar> Cars = new List<GuestCar>();
-        public bool VacancyOpen = true;
+        public bool VacancyOpen = false;
         public bool Paused;
         public bool PauseMenuOpen;
         public bool BobHired;
@@ -148,7 +148,8 @@ namespace Vacancy
                 Story = global::Vacancy.Story.Create(),
                 Shelter = global::Vacancy.Shelter.Create(),
                 Stage = 1,
-                Tutorial = new TutorialProgress()
+                Tutorial = new TutorialProgress(),
+                VacancyOpen = false
             };
 
             for (int i = 0; i < roomCount; i++)

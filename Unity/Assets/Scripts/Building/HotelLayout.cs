@@ -83,17 +83,7 @@ namespace Vacancy
                 DeskPc = new DeskSpot { X = desk.X + desk.W / 2f - 22f, Y = desk.Y - 2f, W = 28, H = 18 },
                 DriveSouth = floor.DriveSouth,
                 PorteCochere = floor.PorteCochere,
-                VacancySign = new DeskSpot
-                {
-                    X = floor.DriveSouth.W > 0
-                        ? floor.DriveSouth.X + floor.DriveSouth.W - 70f
-                        : parking.Center.X - 80f,
-                    Y = floor.DriveSouth.W > 0
-                        ? floor.DriveSouth.Y + floor.DriveSouth.H - 40f
-                        : parking.Y + parking.H - 48f,
-                    W = 140,
-                    H = 36
-                },
+                VacancySign = PlaceVacancySign(floor, parking),
                 Spawn = new Point(desk.X + 50f, desk.Y + 46f),
                 StairsTop = stairs.W > 0
                     ? new Point(stairs.X + stairs.W - floor.Tile * 2.5f, stairs.Y + stairs.H * 0.55f)
@@ -148,6 +138,29 @@ namespace Vacancy
         {
             if (Newspaper == null) return DeskApproach();
             return new Point(Newspaper.X, Newspaper.Y + Newspaper.H / 2f + 18f);
+        }
+
+        static DeskSpot PlaceVacancySign(BuiltFloor floor, Rect parking)
+        {
+            const float size = 16f;
+            if (floor == null || floor.DriveSouth.W <= 0f)
+            {
+                return new DeskSpot
+                {
+                    X = parking.Center.X - 80f,
+                    Y = parking.Y + parking.H - 48f,
+                    W = size,
+                    H = size
+                };
+            }
+
+            var drive = floor.DriveSouth;
+            // East shoulder of the south access drive, at the highway frontage —
+            // past the 90-unit lane and not under the porte-cochère.
+            float laneRight = drive.X + ParkingDriveWidth + 18f;
+            float x = System.Math.Max(laneRight, drive.X + drive.W - 22f);
+            float y = drive.Y + drive.H - 22f;
+            return new DeskSpot { X = x, Y = y, W = size, H = size };
         }
 
         static DeskSpot PlaceNewspaperBox(BuiltFloor floor, NavGrid grid)

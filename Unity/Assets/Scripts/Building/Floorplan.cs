@@ -207,7 +207,9 @@ namespace Vacancy
                 walkNorth.Y + walkNorth.H,
                 northWing.X + northWing.W - (walkNorth.X + walkW),
                 lobbyRect.Y - (walkNorth.Y + walkNorth.H));
-            var canopy = new Rect(lobbyRect.X, lobbyRect.Y + lobbyRect.H, Down(480), canopyH);
+            // Pull-up canopy over the lobby south door — match lobby width so
+            // the roof and pillars stay off the east drive / highway.
+            var canopy = new Rect(lobbyRect.X, lobbyRect.Y + lobbyRect.H, lobbyRect.W, canopyH);
             var driveSouth = new Rect(
                 lobbyRect.X + lobbyRect.W,
                 lobbyRect.Y,

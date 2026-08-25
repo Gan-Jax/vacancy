@@ -109,8 +109,8 @@ namespace Vacancy
             }
 
             var sign = layout.VacancySign;
-            vacancyFill = Quad("Sign", new Rect(sign.X - sign.W / 2f, sign.Y - sign.H / 2f, sign.W, sign.H), Palette.Hex("#2f6b3a"), 5);
-            vacancyLabel = Label("VACANCY", sign.X - 42, sign.Y - 8, Color.white, 14);
+            vacancyFill = Quad("Sign", new Rect(sign.X - 24f, sign.Y - 8f, 48f, 16f), Palette.Hex("#7a2e2e"), 5);
+            vacancyLabel = Label("NO VACANCY", sign.X - 36, sign.Y - 8, Color.white, 11);
 
             hint = Label("", 16, layout.Height - 22, Palette.Muted, 12);
             pausedLabel = Label("PAUSED", layout.Width / 2f - 60, layout.Height / 2f - 16, Color.white, 28);

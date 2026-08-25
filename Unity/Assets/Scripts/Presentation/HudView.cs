@@ -65,6 +65,7 @@ namespace Vacancy
         readonly GameObject deskPcBookPage;
         readonly Button deskPcCheckInBtn;
         readonly Button deskPcCheckOutBtn;
+        readonly Button deskPcVacancyBtn;
         readonly Text deskPcCheckoutInfo;
         readonly Button deskPcCheckoutAction;
         readonly Text deskPcLog;
@@ -272,9 +273,10 @@ namespace Vacancy
             deskPcHomePage = PageOn(deskPcPanel.transform, "Home");
             MakeText(deskPcHomePage.transform, "Front desk PC", new Vector2(0, 200), 20, Palette.Accent, 520);
             MakeText(deskPcHomePage.transform, "Check guests in and out. Guest book is read-only.", new Vector2(0, 156), 14, Palette.Muted, 520);
-            deskPcCheckInBtn = ButtonOn(deskPcHomePage.transform, "Check in (0)", new Vector2(0, 70), () => game.ReviewArrivalFromDeskPc(), 280, 44);
-            deskPcCheckOutBtn = ButtonOn(deskPcHomePage.transform, "Check out (0)", new Vector2(0, 10), () => ShowDeskPcPage("checkout"), 280, 44);
-            ButtonOn(deskPcHomePage.transform, "Guest book", new Vector2(0, -50), () => ShowDeskPcPage("book"), 280, 44);
+            deskPcCheckInBtn = ButtonOn(deskPcHomePage.transform, "Check in (0)", new Vector2(0, 80), () => game.ReviewArrivalFromDeskPc(), 280, 44);
+            deskPcCheckOutBtn = ButtonOn(deskPcHomePage.transform, "Check out (0)", new Vector2(0, 24), () => ShowDeskPcPage("checkout"), 280, 44);
+            ButtonOn(deskPcHomePage.transform, "Guest book", new Vector2(0, -32), () => ShowDeskPcPage("book"), 280, 44);
+            deskPcVacancyBtn = ButtonOn(deskPcHomePage.transform, "Sign: NO VACANCY", new Vector2(0, -88), () => game.ToggleVacancy(), 280, 44);
             ButtonOn(deskPcHomePage.transform, "Close", new Vector2(0, -200), () => game.CloseDeskPc(), 140, 32);
 
             deskPcCheckoutPage = PageOn(deskPcPanel.transform, "Checkout");
@@ -683,6 +685,13 @@ namespace Vacancy
             {
                 deskPcCheckOutBtn.interactable = checkOut > 0;
                 deskPcCheckOutBtn.GetComponentInChildren<Text>().text = $"Check out ({checkOut})";
+            }
+
+            if (deskPcVacancyBtn != null)
+            {
+                deskPcVacancyBtn.GetComponentInChildren<Text>().text = state.VacancyOpen
+                    ? "Sign: VACANCY"
+                    : "Sign: NO VACANCY";
             }
 
             var leaving = Economy.FirstWaitingCheckout(state);

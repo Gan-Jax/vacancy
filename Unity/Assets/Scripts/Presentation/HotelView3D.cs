@@ -67,7 +67,10 @@ namespace Vacancy
                 }
             }
 
-            vacancySign.sharedMaterial = Mat(state.VacancyOpen ? Palette.Hex("#2f6b3a") : Palette.Hex("#7a2e2e"));
+            if (vacancySign != null)
+            {
+                vacancySign.sharedMaterial = Mat(state.VacancyOpen ? Palette.Hex("#2f6b3a") : Palette.Hex("#7a2e2e"));
+            }
 
             int used = 0;
             int deskIndex = 0;
@@ -523,22 +526,54 @@ namespace Vacancy
                 MarkInteract(screen, "office");
             }
 
-            var sign = layout.VacancySign;
-            vacancySign = Box(
-                "Sign",
-                new Rect(sign.X - sign.W / 2f, sign.Y - 8f, sign.W, 16f),
-                1.2f,
-                1.8f,
-                Palette.Hex("#2f6b3a"));
-            MarkInteract(vacancySign, "sign");
-            Box(
-                "SignPost",
-                new Rect(sign.X - 4f, sign.Y - 4f, 8f, 8f),
-                0.55f,
-                1.1f,
-                Palette.Hex("#2a2430"));
+            BuildVacancyPole();
 
             BuildNewspaperBox();
+        }
+
+        void BuildVacancyPole()
+        {
+            var sign = layout.VacancySign;
+            if (sign == null) return;
+
+            const float poleHeight = 5.4f;
+            const float faceHeight = 1.35f;
+            float faceY = poleHeight - faceHeight * 0.42f;
+            float post = 6f;
+            float foot = 14f;
+            float faceW = 48f;
+            float faceD = 4f;
+
+            Box(
+                "SignFooting",
+                new Rect(sign.X - foot / 2f, sign.Y - foot / 2f, foot, foot),
+                0.16f,
+                0.32f,
+                Palette.Hex("#4a4550"));
+            var baseHit = Box(
+                "SignBase",
+                new Rect(sign.X - 8f, sign.Y - 8f, 16f, 16f),
+                0.7f,
+                1.2f,
+                Palette.Hex("#2a2430"));
+            MarkInteract(baseHit, "sign");
+            Cylinder(
+                "SignPole",
+                sign.X,
+                sign.Y,
+                poleHeight * 0.5f,
+                poleHeight,
+                post,
+                Palette.Hex("#2a2430"),
+                false);
+
+            vacancySign = Box(
+                "Sign",
+                new Rect(sign.X - faceW / 2f, sign.Y - faceD / 2f, faceW, faceD),
+                faceY,
+                faceHeight,
+                Palette.Hex("#7a2e2e"));
+            MarkInteract(vacancySign, "sign");
         }
 
         void BuildNewspaperBox()
@@ -1579,6 +1614,27 @@ namespace Vacancy
                 cubeMesh,
                 WorldScale.ToWorld(rect.X + rect.W / 2f, rect.Y + rect.H / 2f, yCenter),
                 WorldScale.Size(rect.W, height, rect.H),
+                color,
+                collider);
+            return go.GetComponent<Renderer>();
+        }
+
+        Renderer Cylinder(
+            string name,
+            float layoutX,
+            float layoutY,
+            float yCenter,
+            float height,
+            float diameter,
+            Color color,
+            bool collider = true)
+        {
+            var go = MeshObject(
+                name,
+                root,
+                cylinderMesh,
+                WorldScale.ToWorld(layoutX, layoutY, yCenter),
+                new Vector3(WorldScale.Meters(diameter), height, WorldScale.Meters(diameter)),
                 color,
                 collider);
             return go.GetComponent<Renderer>();

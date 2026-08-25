@@ -265,7 +265,7 @@ namespace Vacancy
         bool NearSign(HotelLayout layout)
         {
             var sign = layout.VacancySign;
-            return sign != null && Geometry.Dist(X, Y, sign.X, sign.Y) < 72;
+            return sign != null && Geometry.Dist(X, Y, sign.X, sign.Y) < 40;
         }
 
         bool NearRoom(Room room, HotelLayout layout)
