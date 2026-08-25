@@ -380,7 +380,7 @@ namespace Vacancy
                         guest.BoughtPaper = true;
                         guest.ArrivePhase = "returning_from_paper";
                         var slot = layout.CheckInLineSlot(CountAtDesk(state));
-                        guest.Path = Pathing.FindPath(layout, guest.X, guest.Y, slot, LobbyWalkOptions(state, guest));
+                        guest.Path = Pathing.PathAlongCourt(layout, guest.X, guest.Y, slot, LobbyWalkOptions(state, guest));
                     }
 
                     continue;
@@ -391,7 +391,7 @@ namespace Vacancy
                     var slot = layout.CheckInLineSlot(CountAtDesk(state));
                     if (guest.Path == null || guest.Path.Count == 0)
                     {
-                        guest.Path = Pathing.FindPath(layout, guest.X, guest.Y, slot, LobbyWalkOptions(state, guest));
+                        guest.Path = Pathing.PathAlongCourt(layout, guest.X, guest.Y, slot, LobbyWalkOptions(state, guest));
                     }
 
                     if (Pathing.FollowPath(guest, dt, state.Rooms, layout, null, speed) ||

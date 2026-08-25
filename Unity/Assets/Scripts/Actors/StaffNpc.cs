@@ -220,7 +220,7 @@ namespace Vacancy
                 if (TargetRoom != null)
                 {
                     Phase = "to_door";
-                    Path = Pathing.FindPath(layout, X, Y, layout.RoomDoor(TargetRoom.Id), GroundPathOptions());
+                    Path = Pathing.PathToRoomDoor(layout, X, Y, TargetRoom.Id, GroundPathOptions());
                 }
                 else if (Phase != "idle" && Phase != "to_closet")
                 {
@@ -257,7 +257,7 @@ namespace Vacancy
             {
                 if (Path.Count == 0)
                 {
-                    Path = Pathing.FindPath(layout, X, Y, layout.RoomDoor(TargetRoom.Id), GroundPathOptions());
+                    Path = Pathing.PathToRoomDoor(layout, X, Y, TargetRoom.Id, GroundPathOptions());
                 }
 
                 if (Pathing.FollowPath(this, dt, state.Rooms, layout, null, speed))

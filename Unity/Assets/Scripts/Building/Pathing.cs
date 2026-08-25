@@ -134,7 +134,7 @@ namespace Vacancy
         {
             options = options ?? new PathOptions();
             if (options.ToFloor == null) options.ToFloor = 0;
-            return FindPath(layout, fromX, fromY, layout.DeskApproach(), options);
+            return PathAlongCourt(layout, fromX, fromY, layout.DeskApproach(), options);
         }
 
         public static List<Point> PathAlongCourt(HotelLayout layout, float fromX, float fromY, Point dest, PathOptions options = null)
@@ -146,29 +146,72 @@ namespace Vacancy
                 return FindPath(layout, fromX, fromY, dest, options);
             }
 
-            bool fromLobby = layout.Lobby.Contains(fromX, fromY, 4f);
-            bool toLobby = layout.Lobby.Contains(dest.X, dest.Y, 4f);
-            if (fromLobby == toLobby)
+            var fromZone = layout.MotorZoneAt(fromX, fromY);
+            var toZone = layout.MotorZoneAt(dest.X, dest.Y);
+            if (fromZone == toZone)
             {
                 return FindPath(layout, fromX, fromY, dest, options);
             }
 
-            var gate = layout.FrontEntrance;
-            var first = FindPath(layout, fromX, fromY, gate, options);
-            var second = FindPath(layout, gate.X, gate.Y, dest, options);
-            var combined = new List<Point>(first.Count + second.Count);
-            combined.AddRange(first);
-            if (second.Count > 0 && combined.Count > 0 && Geometry.Dist(combined[combined.Count - 1], second[0]) < 4f)
+            var east = layout.EastEntrance;
+            var north = layout.FrontEntrance;
+            var south = layout.SouthEntrance;
+
+            if (fromZone == MotorZone.Lobby)
             {
-                for (int i = 1; i < second.Count; i++) combined.Add(second[i]);
-            }
-            else
-            {
-                combined.AddRange(second);
+                return PathVia(layout, fromX, fromY, options, layout.LobbyGateFor(dest.X, dest.Y), dest);
             }
 
-            if (combined.Count == 0) combined.Add(dest);
-            return combined;
+            if (toZone == MotorZone.Lobby)
+            {
+                return PathVia(layout, fromX, fromY, options, layout.LobbyGateFor(fromX, fromY), dest);
+            }
+
+            if (fromZone == MotorZone.Drive && toZone == MotorZone.Court)
+            {
+                return PathVia(layout, fromX, fromY, options, east, north, dest);
+            }
+
+            if (fromZone == MotorZone.Court && toZone == MotorZone.Drive)
+            {
+                return PathVia(layout, fromX, fromY, options, north, east, dest);
+            }
+
+            if (fromZone == MotorZone.Canopy && toZone == MotorZone.Court)
+            {
+                return PathVia(layout, fromX, fromY, options, south, north, dest);
+            }
+
+            if (fromZone == MotorZone.Court && toZone == MotorZone.Canopy)
+            {
+                return PathVia(layout, fromX, fromY, options, north, south, dest);
+            }
+
+            return FindPath(layout, fromX, fromY, dest, options);
+        }
+
+        static List<Point> PathVia(HotelLayout layout, float fromX, float fromY, PathOptions options, params Point[] stops)
+        {
+            var path = new List<Point>();
+            float x = fromX;
+            float y = fromY;
+            foreach (var stop in stops)
+            {
+                AppendLeg(path, FindPath(layout, x, y, stop, options));
+                x = stop.X;
+                y = stop.Y;
+            }
+
+            if (path.Count == 0 && stops.Length > 0) path.Add(stops[stops.Length - 1]);
+            return path;
+        }
+
+        static void AppendLeg(List<Point> path, List<Point> leg)
+        {
+            if (leg == null || leg.Count == 0) return;
+            int start = 0;
+            if (path.Count > 0 && Geometry.Dist(path[path.Count - 1], leg[0]) < 4f) start = 1;
+            for (int i = start; i < leg.Count; i++) path.Add(leg[i]);
         }
 
         public static List<Point> PathGuestToDesk(HotelLayout layout, float fromX, float fromY, PathOptions options = null)
@@ -182,7 +225,7 @@ namespace Vacancy
         {
             options = options ?? new PathOptions();
             if (options.ToFloor == null) options.ToFloor = 0;
-            return FindPath(layout, fromX, fromY, layout.NewspaperApproach(), options);
+            return PathAlongCourt(layout, fromX, fromY, layout.NewspaperApproach(), options);
         }
 
         public static bool SteerTo(IMover entity, float tx, float ty, float dt, List<Room> rooms, HotelLayout layout, object allowRoomId, float speed)

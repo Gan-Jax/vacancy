@@ -121,6 +121,8 @@ namespace Vacancy
         public Rect DriveSouth;
         public Rect CornerMass;
         public Point LotEntrance;
+        public Point LotEntranceEast;
+        public Point LotEntranceSouth;
         public bool OutdoorCourt;
     }
 
@@ -262,6 +264,10 @@ namespace Vacancy
             }
 
             var northDoor = MakeDoor(lobbyRect, "north", spec.DoorWidth, 0.42f, tile);
+            var southDoor = MakeDoor(lobbyRect, "south", spec.DoorWidth * 2f, 0.5f, tile);
+            // Wide east opening centered on drive traffic (~y 1180) so radius-12
+            // guests are not sent along the solid wall to the north courtyard door.
+            var eastDoor = MakeDoor(lobbyRect, "east", spec.DoorWidth * 2f, 0.65f, tile);
             floor.Areas.Add(new FloorArea
             {
                 Id = "lobby",
@@ -269,14 +275,11 @@ namespace Vacancy
                 Label = "Lobby",
                 Rect = lobbyRect,
                 Walls = true,
-                Doors = new List<Door>
-                {
-                    northDoor,
-                    MakeDoor(lobbyRect, "south", spec.DoorWidth * 2f, 0.5f, tile),
-                    MakeDoor(lobbyRect, "east", spec.DoorWidth, 0.78f, tile)
-                }
+                Doors = new List<Door> { northDoor, southDoor, eastDoor }
             });
             floor.LotEntrance = OutsidePoint(northDoor, tile);
+            floor.LotEntranceEast = OutsidePoint(eastDoor, tile);
+            floor.LotEntranceSouth = OutsidePoint(southDoor, tile);
 
             float officeW = Down(220);
             float officeH = Down(90);

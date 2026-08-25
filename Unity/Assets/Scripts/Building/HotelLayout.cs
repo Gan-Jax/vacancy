@@ -251,6 +251,57 @@ namespace Vacancy
             }
         }
 
+        public Point EastEntrance
+        {
+            get
+            {
+                if (Floor != null && (Floor.LotEntranceEast.X != 0f || Floor.LotEntranceEast.Y != 0f))
+                {
+                    return Floor.LotEntranceEast;
+                }
+
+                return new Point(Lobby.X + Lobby.W + 20f, Lobby.Y + Lobby.H * 0.6f);
+            }
+        }
+
+        public Point SouthEntrance
+        {
+            get
+            {
+                if (Floor != null && (Floor.LotEntranceSouth.X != 0f || Floor.LotEntranceSouth.Y != 0f))
+                {
+                    return Floor.LotEntranceSouth;
+                }
+
+                return new Point(Lobby.X + Lobby.W / 2f, Lobby.Y + Lobby.H + 20f);
+            }
+        }
+
+        public MotorZone MotorZoneAt(float x, float y)
+        {
+            if (Lobby.W > 0 && Lobby.Contains(x, y, 4f)) return MotorZone.Lobby;
+            if (DriveSouth.W > 0 && x >= Lobby.X + Lobby.W - 4f && DriveSouth.Contains(x, y, 12f))
+            {
+                return MotorZone.Drive;
+            }
+
+            if ((PorteCochere.W > 0 && PorteCochere.Contains(x, y, 8f)) ||
+                (Lobby.W > 0 && y >= Lobby.Y + Lobby.H - 4f && x <= Lobby.X + Lobby.W + 8f))
+            {
+                return MotorZone.Canopy;
+            }
+
+            return MotorZone.Court;
+        }
+
+        public Point LobbyGateFor(float x, float y)
+        {
+            var zone = MotorZoneAt(x, y);
+            if (zone == MotorZone.Drive) return EastEntrance;
+            if (zone == MotorZone.Canopy) return SouthEntrance;
+            return FrontEntrance;
+        }
+
         public Point DriveLaneCorner(float carY)
         {
             return DrivePoint(DriveCenterX, carY);
@@ -624,6 +675,14 @@ namespace Vacancy
 
             return problems;
         }
+    }
+
+    public enum MotorZone
+    {
+        Lobby,
+        Drive,
+        Canopy,
+        Court
     }
 
     public struct StallPose

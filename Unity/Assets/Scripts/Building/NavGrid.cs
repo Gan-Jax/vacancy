@@ -75,7 +75,11 @@ namespace Vacancy
                 foreach (var door in area.Doors) CarveDoor(grid, area, door);
             }
 
-            if (level >= 0) SealEnvelope(grid, floor);
+            if (level >= 0)
+            {
+                SealEnvelope(grid, floor);
+                ChamferLobbyDriveCorner(grid, floor);
+            }
 
             grid.Clearance = ComputeClearance(grid);
             return grid;
@@ -211,6 +215,23 @@ namespace Vacancy
             }
         }
 
+        static void ChamferLobbyDriveCorner(NavGrid grid, BuiltFloor floor)
+        {
+            if (floor == null || !floor.OutdoorCourt || floor.Lobby.W <= 0f) return;
+            AreaCellRange(grid, floor.Lobby, out _, out int r0, out int c1, out _);
+            UnblockCell(grid, c1, r0);
+            UnblockCell(grid, c1, r0 - 1);
+            UnblockCell(grid, c1 + 1, r0);
+        }
+
+        static void UnblockCell(NavGrid grid, int col, int row)
+        {
+            if (col < 0 || row < 0 || col >= grid.Cols || row >= grid.Rows) return;
+            int i = row * grid.Cols + col;
+            grid.Blocked[i] = 0;
+            if (grid.Cost != null) grid.Cost[i] = 1f;
+        }
+
         static void BlockCell(NavGrid grid, int col, int row)
         {
             if (col < 0 || row < 0 || col >= grid.Cols || row >= grid.Rows) return;
@@ -297,9 +318,14 @@ namespace Vacancy
             }
 
             int doorCol = door.Side == "west" ? c0 : c1;
+            int pad = door.Side == "east" ? 1 : -1;
             int fromY = (int)Math.Floor((door.Center.Y - half - grid.OriginY) / grid.Tile);
             int toY = (int)Math.Ceiling((door.Center.Y + half - grid.OriginY) / grid.Tile) - 1;
-            for (int row = fromY; row <= toY; row++) Open(doorCol, row);
+            for (int row = fromY; row <= toY; row++)
+            {
+                Open(doorCol, row);
+                Open(doorCol + pad, row);
+            }
         }
 
         public static Cell WorldToCell(NavGrid grid, float x, float y)
