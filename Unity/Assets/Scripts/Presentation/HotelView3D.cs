@@ -128,6 +128,11 @@ namespace Vacancy
                     label = $"{guest.Name} paper";
                     color = Palette.Paper;
                 }
+                else if (guest.Phase == "walkabout")
+                {
+                    label = $"{guest.Name} out";
+                    color = Palette.Hex("#c4b08a");
+                }
 
                 float lookX = guest.Phase == "waiting_checkout" ? layout.FrontDesk.X : float.NaN;
                 float lookY = guest.Phase == "waiting_checkout" ? layout.FrontDesk.Y : float.NaN;

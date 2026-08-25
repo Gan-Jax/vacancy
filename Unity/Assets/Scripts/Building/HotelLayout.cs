@@ -140,6 +140,16 @@ namespace Vacancy
             return new Point(Newspaper.X, Newspaper.Y + Newspaper.H / 2f + 18f);
         }
 
+        public Point WalkaboutSpot(int index)
+        {
+            int n = ((index % 3) + 3) % 3;
+            if (n == 0) return NewspaperApproach();
+            if (n == 1) return DeskApproach();
+            if (Floor != null && Floor.WalkWest.W > 0f) return Floor.WalkWest.Center;
+            if (Floor != null && Floor.WalkNorth.W > 0f) return Floor.WalkNorth.Center;
+            return FrontEntrance;
+        }
+
         static DeskSpot PlaceVacancySign(BuiltFloor floor, Rect parking)
         {
             const float size = 16f;

@@ -107,6 +107,14 @@ namespace Vacancy
             return state.Inventory.Stock.TryGetValue(itemId, out var qty) ? qty : 0;
         }
 
+        public static bool TrySpend(GameState state, string itemId, int qty)
+        {
+            if (string.IsNullOrEmpty(itemId) || qty <= 0) return true;
+            if (GetStock(state, itemId) < qty) return false;
+            state.Inventory.Stock[itemId] = GetStock(state, itemId) - qty;
+            return true;
+        }
+
         public static Dictionary<string, int> SuppliesNeededForCheckIn(Room room)
         {
             var needed = new Dictionary<string, int>

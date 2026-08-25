@@ -760,6 +760,7 @@ namespace Vacancy
             room.DirtLevel = GameConfig.PickWeightedLevel(GameConfig.DirtWeights);
             room.RepairLevel = null;
             room.HasHiddenDamage = guest.HasHiddenDamage;
+            Requests.DropForRoom(state, room.Id);
 
             state.AddLog(
                 $"{guest.Name} left Room {room.Id} and is heading to the front desk to check out. Inspect the room.");
@@ -811,6 +812,8 @@ namespace Vacancy
                             guest.Path.Clear();
                             state.AddLog($"{guest.Name} arrived at Room {guest.RoomId}.");
                             MaybeQueueRoomPaperTrip(guest);
+                            Requests.MaybeQueue(guest);
+                            MaybeQueueWalkabout(guest);
                         }
                     }
 
@@ -838,6 +841,16 @@ namespace Vacancy
                         if (guest.PaperTripIn <= 0 && guest.StayRemainingHours > 2f)
                         {
                             BeginGuestPaperTrip(guest);
+                            continue;
+                        }
+                    }
+
+                    if (guest.WalkaboutIn != null && guest.WalkaboutIn > 0 && !guest.DidWalkabout)
+                    {
+                        guest.WalkaboutIn -= hoursPassed;
+                        if (guest.WalkaboutIn <= 0 && guest.StayRemainingHours > 3f)
+                        {
+                            BeginGuestWalkabout(layout, guest);
                         }
                     }
 
@@ -847,6 +860,12 @@ namespace Vacancy
                 if (guest.Phase == "buying_paper")
                 {
                     UpdateGuestPaperTrip(state, layout, guest, dt, speed);
+                    continue;
+                }
+
+                if (guest.Phase == "walkabout")
+                {
+                    UpdateGuestWalkabout(state, layout, guest, dt, speed);
                     continue;
                 }
 
@@ -922,6 +941,113 @@ namespace Vacancy
         {
             if (guest.Nav == "enter_room" || guest.Nav == "exit_room") return guest.RoomId;
             return null;
+        }
+
+        static void MaybeQueueWalkabout(Guest guest)
+        {
+            if (guest == null || guest.DidWalkabout || guest.WalkaboutIn != null) return;
+            if (GameRng.NextFloat() < GameConfig.GuestWalkaboutChance)
+            {
+                guest.WalkaboutIn = GameConfig.GuestWalkaboutMinHours
+                    + GameRng.NextFloat() * (GameConfig.GuestWalkaboutMaxHours - GameConfig.GuestWalkaboutMinHours);
+            }
+            else
+            {
+                guest.WalkaboutIn = 0f;
+            }
+        }
+
+        static void BeginGuestWalkabout(HotelLayout layout, Guest guest)
+        {
+            var dest = layout != null ? layout.WalkaboutSpot(GameRng.NextInt(0, 2)) : new Point(guest.X, guest.Y);
+            guest.Phase = "walkabout";
+            guest.Nav = "exit_room";
+            if (guest.Path == null) guest.Path = new List<Point>();
+            else guest.Path.Clear();
+            guest.WalkaboutIn = 0f;
+            guest.DidWalkabout = true;
+            guest.TargetX = dest.X;
+            guest.TargetY = dest.Y;
+            guest.WalkLingerSeconds = GameConfig.GuestWalkaboutLingerMin
+                + GameRng.NextFloat() * (GameConfig.GuestWalkaboutLingerMax - GameConfig.GuestWalkaboutLingerMin);
+        }
+
+        static void UpdateGuestWalkabout(GameState state, HotelLayout layout, Guest guest, float dt, float speed)
+        {
+            object allow = GuestAllowRoom(guest);
+            Pathing.ResolveRoomCollision(guest, state.Rooms, layout, allow);
+            var dest = new Point(guest.TargetX, guest.TargetY);
+
+            if (guest.Nav == "exit_room")
+            {
+                var door = layout.RoomDoor(guest.RoomId);
+                Pathing.SteerTo(guest, door.X, door.Y, dt, state.Rooms, layout, guest.RoomId, speed);
+                if (Geometry.Dist(guest.X, guest.Y, door.X, door.Y) < 16)
+                {
+                    guest.Nav = "to_spot";
+                    guest.Path = Pathing.PathAlongCourt(layout, guest.X, guest.Y, dest);
+                }
+
+                return;
+            }
+
+            if (guest.Nav == "to_spot")
+            {
+                if (guest.Path == null || guest.Path.Count == 0)
+                {
+                    guest.Path = Pathing.PathAlongCourt(layout, guest.X, guest.Y, dest);
+                }
+
+                if (guest.Path == null || guest.Path.Count == 0 ||
+                    Pathing.FollowPath(guest, dt, state.Rooms, layout, null, speed) ||
+                    Geometry.Dist(guest.X, guest.Y, dest.X, dest.Y) < 14f)
+                {
+                    guest.Nav = "linger";
+                    guest.Path.Clear();
+                    guest.X = dest.X;
+                    guest.Y = dest.Y;
+                }
+
+                return;
+            }
+
+            if (guest.Nav == "linger")
+            {
+                guest.WalkLingerSeconds -= dt;
+                if (guest.WalkLingerSeconds > 0f) return;
+                guest.Nav = "to_door";
+                guest.Path = Pathing.PathToRoomDoor(layout, guest.X, guest.Y, guest.RoomId);
+                return;
+            }
+
+            if (guest.Nav == "to_door")
+            {
+                if (guest.Path == null || guest.Path.Count == 0)
+                {
+                    guest.Path = Pathing.PathToRoomDoor(layout, guest.X, guest.Y, guest.RoomId);
+                }
+
+                if (Pathing.FollowPath(guest, dt, state.Rooms, layout, null, speed))
+                {
+                    guest.Nav = "enter_room";
+                    guest.Path.Clear();
+                }
+
+                return;
+            }
+
+            var roomDest = layout.RoomInterior(guest.RoomId);
+            guest.TargetX = roomDest.X;
+            guest.TargetY = roomDest.Y;
+            Pathing.SteerTo(guest, roomDest.X, roomDest.Y, dt, state.Rooms, layout, guest.RoomId, speed);
+            if (Geometry.Dist(guest.X, guest.Y, roomDest.X, roomDest.Y) < 22)
+            {
+                guest.X = roomDest.X;
+                guest.Y = roomDest.Y;
+                guest.Phase = "in_room";
+                guest.Nav = null;
+                guest.Path.Clear();
+            }
         }
 
         static void MaybeQueueRoomPaperTrip(Guest guest)
@@ -1125,6 +1251,7 @@ namespace Vacancy
             Story.Update(state, hoursPassed);
             Media.Update(state, hoursPassed);
             InventorySystem.UpdateOrders(state, hoursPassed);
+            Requests.Tick(state, hoursPassed);
             UpdateGuests(state, dt, layout);
             ProcessWaitingGuests(state, hoursPassed);
             UpdateArrivals(state, dt, layout);

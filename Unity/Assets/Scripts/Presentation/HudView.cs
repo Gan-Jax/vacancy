@@ -59,6 +59,7 @@ namespace Vacancy
         readonly Text paperLog;
         readonly GameObject phonePanel;
         readonly Text phoneRequests;
+        readonly Button phoneSendMary;
         readonly GameObject deskPcPanel;
         readonly GameObject deskPcHomePage;
         readonly GameObject deskPcCheckoutPage;
@@ -83,6 +84,7 @@ namespace Vacancy
         readonly Text pauseJournalBody;
         readonly Text pauseSensitivity;
         readonly Text pauseInvert;
+        readonly Button pauseContinue;
         string pausePage = "root";
 
         GameObject holdRoot;
@@ -254,19 +256,21 @@ namespace Vacancy
             ButtonOn(paperPanel.transform, "Close", new Vector2(0, -200), () => game.ClosePaper(), 140, 32);
             paperPanel.SetActive(false);
 
-            phonePanel = Panel("DeskPhone", canvasGo.transform, new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(560, 420));
-            MakeText(phonePanel.transform, "Front desk phone", new Vector2(0, 160), 20, Palette.Accent, 520);
-            MakeText(phonePanel.transform, "Requests", new Vector2(0, 110), 14, Palette.Muted, 520);
+            phonePanel = Panel("DeskPhone", canvasGo.transform, new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(560, 500));
+            MakeText(phonePanel.transform, "Front desk phone", new Vector2(0, 210), 20, Palette.Accent, 520);
+            MakeText(phonePanel.transform, "Requests", new Vector2(0, 168), 14, Palette.Muted, 520);
             phoneRequests = MakeText(
                 phonePanel.transform,
-                "No guest requests yet.\nUse the desk PC to check guests in and out.",
+                "No guest calls waiting.",
                 new Vector2(0, 20),
                 15,
                 Palette.Text,
                 520);
             phoneRequests.alignment = TextAnchor.UpperCenter;
-            phoneRequests.rectTransform.sizeDelta = new Vector2(520, 160);
-            ButtonOn(phonePanel.transform, "Close", new Vector2(0, -160), () => game.ClosePhone(), 140, 32);
+            phoneRequests.rectTransform.sizeDelta = new Vector2(520, 240);
+            phoneRequests.verticalOverflow = VerticalWrapMode.Overflow;
+            phoneSendMary = ButtonOn(phonePanel.transform, "Send Mary", new Vector2(0, -150), () => game.SendMaryForRequest(), 200, 36);
+            ButtonOn(phonePanel.transform, "Close", new Vector2(0, -200), () => game.ClosePhone(), 140, 32);
             phonePanel.SetActive(false);
 
             deskPcPanel = Panel("DeskPc", canvasGo.transform, new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(560, 500));
@@ -318,17 +322,19 @@ namespace Vacancy
             Stretch(pauseOverlay.GetComponent<RectTransform>(), 0, 0, 0, 0);
             pauseOverlay.GetComponent<Image>().color = new Color(0.05f, 0.06f, 0.09f, 0.72f);
 
-            var pausePanel = Panel("PauseMenu", pauseOverlay.transform, new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(460, 500));
-            MakeText(pausePanel.transform, "Paused", new Vector2(0, 214), 28, Palette.Accent, 400).alignment = TextAnchor.MiddleCenter;
+            var pausePanel = Panel("PauseMenu", pauseOverlay.transform, new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(460, 580));
+            MakeText(pausePanel.transform, "Paused", new Vector2(0, 250), 28, Palette.Accent, 400).alignment = TextAnchor.MiddleCenter;
 
             pauseRootPage = new GameObject("Root", typeof(RectTransform));
             pauseRootPage.transform.SetParent(pausePanel.transform, false);
             Stretch(pauseRootPage.GetComponent<RectTransform>(), 20, 20, 20, 70);
-            ButtonOn(pauseRootPage.transform, "Resume", new Vector2(0, 110), () => game.ResumeFromMenu(), 280, 40);
-            ButtonOn(pauseRootPage.transform, "Journal", new Vector2(0, 54), () => ShowPausePage("journal"), 280, 40);
-            ButtonOn(pauseRootPage.transform, "Settings", new Vector2(0, -2), () => ShowPausePage("settings"), 280, 40);
-            ButtonOn(pauseRootPage.transform, "Quit game", new Vector2(0, -58), () => ShowPausePage("quit"), 280, 40);
-            MakeText(pauseRootPage.transform, "Esc resumes · hold RMB to look", new Vector2(0, -130), 13, Palette.Muted, 380).alignment = TextAnchor.MiddleCenter;
+            ButtonOn(pauseRootPage.transform, "Resume", new Vector2(0, 150), () => game.ResumeFromMenu(), 280, 40);
+            ButtonOn(pauseRootPage.transform, "Save", new Vector2(0, 94), () => game.SaveGame(), 280, 40);
+            pauseContinue = ButtonOn(pauseRootPage.transform, "Continue", new Vector2(0, 38), () => game.LoadGame(), 280, 40);
+            ButtonOn(pauseRootPage.transform, "Journal", new Vector2(0, -18), () => ShowPausePage("journal"), 280, 40);
+            ButtonOn(pauseRootPage.transform, "Settings", new Vector2(0, -74), () => ShowPausePage("settings"), 280, 40);
+            ButtonOn(pauseRootPage.transform, "Quit game", new Vector2(0, -130), () => ShowPausePage("quit"), 280, 40);
+            MakeText(pauseRootPage.transform, "Esc resumes · hold RMB to look", new Vector2(0, -186), 13, Palette.Muted, 380).alignment = TextAnchor.MiddleCenter;
 
             pauseJournalPage = new GameObject("Journal", typeof(RectTransform));
             pauseJournalPage.transform.SetParent(pausePanel.transform, false);
@@ -376,6 +382,7 @@ namespace Vacancy
 
             pauseOverlay.SetActive(false);
             RefreshPauseSettings();
+            RefreshPauseSaveButtons();
 
             Refresh(true);
         }
@@ -509,6 +516,7 @@ namespace Vacancy
             if (state.PauseMenuOpen)
             {
                 pauseJournalBody.text = Stage.JournalBody(state);
+                RefreshPauseSaveButtons();
                 pauseOverlay.SetActive(true);
             }
             else
@@ -522,6 +530,7 @@ namespace Vacancy
         {
             ShowPausePage("root");
             pauseJournalBody.text = Stage.JournalBody(state);
+            RefreshPauseSaveButtons();
             pauseOverlay.SetActive(true);
         }
 
@@ -646,7 +655,19 @@ namespace Vacancy
 
         void RefreshPhone()
         {
-            phoneRequests.text = "No guest requests yet.\nUse the desk PC to check guests in and out.";
+            phoneRequests.text = Requests.PhoneBody(state);
+            if (phoneSendMary != null)
+            {
+                phoneSendMary.interactable = state.MaryHired && state.Requests != null && state.Requests.Count > 0;
+                phoneSendMary.GetComponentInChildren<Text>().text = state.MaryHired
+                    ? (state.Requests.Count > 0 ? "Send Mary" : "No calls for Mary")
+                    : "Hire Mary first";
+            }
+        }
+
+        public void RefreshPauseSaveButtons()
+        {
+            if (pauseContinue != null) pauseContinue.interactable = SaveSystem.Exists();
         }
 
         public void ShowDeskPc()

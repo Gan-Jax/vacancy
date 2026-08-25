@@ -165,6 +165,16 @@ namespace Vacancy
                     label = guest.UpsetCheckout ? $"{guest.Name} upset" : $"{guest.Name} out {waitLeft}h";
                     color = guest.UpsetCheckout ? Palette.Hex("#ff8f8f") : Palette.Accent;
                 }
+                else if (guest.Phase == "buying_paper")
+                {
+                    label = $"{guest.Name} paper";
+                    color = Palette.Paper;
+                }
+                else if (guest.Phase == "walkabout")
+                {
+                    label = $"{guest.Name} out";
+                    color = Palette.Hex("#c4b08a");
+                }
 
                 PlaceCharacter(used++, guest.X, guest.Y, guest.Radius, color, label);
             }

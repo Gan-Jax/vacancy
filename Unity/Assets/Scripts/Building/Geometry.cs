@@ -1,5 +1,6 @@
 namespace Vacancy
 {
+    [System.Serializable]
     public struct Point
     {
         public float X;

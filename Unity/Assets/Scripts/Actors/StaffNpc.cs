@@ -112,6 +112,20 @@ namespace Vacancy
             return paid;
         }
 
+        public void RestorePayroll(StaffSave save)
+        {
+            if (save == null) return;
+            WagesOwed = save.WagesOwed;
+            DaysWorkedInPeriod = save.DaysWorkedInPeriod;
+            PeriodDays = save.PeriodDays;
+            PaydayDue = save.PaydayDue;
+            WorkedToday = save.WorkedToday;
+            TargetRoom = null;
+            ActiveTask = null;
+            Phase = "idle";
+            Path = new List<Point>();
+        }
+
         public void BeginPaydayTrip(HotelLayout layout)
         {
             TargetRoom = null;

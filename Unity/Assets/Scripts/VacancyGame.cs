@@ -354,6 +354,8 @@ namespace Vacancy
             }
             else if (room.Status == "occupied")
             {
+                if (Requests.TryFulfillAtRoom(state, room)) return;
+                if (Requests.OpenForRoom(state, room.Id) != null) return;
                 state.AddLog($"{room.GuestName} is still staying in Room {room.Id}.");
             }
         }
@@ -421,27 +423,48 @@ namespace Vacancy
         public void HireBob()
         {
             if (!Economy.HireBob(state)) return;
-            bob = StaffNpc.SpawnAtHome(layout, new StaffProfile
-            {
-                Id = "bob",
-                Name = "Bob",
-                Role = "repair",
-                Color = "#ffb347",
-                Department = "maintenance"
-            });
+            bob = SpawnBob();
         }
 
         public void HireMary()
         {
             if (!Economy.HireMary(state)) return;
-            mary = StaffNpc.SpawnAtHome(layout, new StaffProfile
+            mary = SpawnMary();
+        }
+
+        public void SendMaryForRequest()
+        {
+            Requests.SendMary(state);
+        }
+
+        public void SaveGame()
+        {
+            if (SaveSystem.Save(state, player, bob, mary))
             {
-                Id = "mary",
-                Name = "Mary",
-                Role = "housekeeping",
-                Color = "#e8a0bf",
-                Department = "housekeeping"
-            });
+                state.AddLog("Game saved.");
+                hud.RefreshPauseSaveButtons();
+            }
+            else
+            {
+                state.AddLog("Could not save the game.");
+            }
+        }
+
+        public void LoadGame()
+        {
+            if (!SaveSystem.Load(state, player, out var bobPay, out var maryPay))
+            {
+                state.AddLog("No save to continue.");
+                hud.RefreshPauseSaveButtons();
+                return;
+            }
+
+            player.ActiveTask = null;
+            RestoreStaff(bobPay, maryPay);
+            SaveSystem.Repath(state, layout);
+            CloseOpenUi();
+            ResumeFromMenu();
+            state.AddLog($"Continued from day {state.Day}.");
         }
 
         public void OpenPc()
@@ -582,6 +605,67 @@ namespace Vacancy
         {
             hud.HideBanner();
             bannerOpen = false;
+        }
+
+        void CloseOpenUi()
+        {
+            state.PcOpen = false;
+            state.MediaOpen = null;
+            state.DeskGuest = null;
+            hud.HideRadio();
+            hud.HidePaper();
+            hud.HidePhone();
+            hud.HideDeskPc();
+            hud.ResetOfficePc();
+            hud.HideBanner();
+            bannerOpen = false;
+        }
+
+        StaffNpc SpawnBob()
+        {
+            return StaffNpc.SpawnAtHome(layout, new StaffProfile
+            {
+                Id = "bob",
+                Name = "Bob",
+                Role = "repair",
+                Color = "#ffb347",
+                Department = "maintenance"
+            });
+        }
+
+        StaffNpc SpawnMary()
+        {
+            return StaffNpc.SpawnAtHome(layout, new StaffProfile
+            {
+                Id = "mary",
+                Name = "Mary",
+                Role = "housekeeping",
+                Color = "#e8a0bf",
+                Department = "housekeeping"
+            });
+        }
+
+        void RestoreStaff(StaffSave bobPay, StaffSave maryPay)
+        {
+            if (state.BobHired)
+            {
+                bob = SpawnBob();
+                bob.RestorePayroll(bobPay);
+            }
+            else
+            {
+                bob = null;
+            }
+
+            if (state.MaryHired)
+            {
+                mary = SpawnMary();
+                mary.RestorePayroll(maryPay);
+            }
+            else
+            {
+                mary = null;
+            }
         }
 
         List<StaffNpc> StaffList()

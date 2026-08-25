@@ -14,7 +14,7 @@ namespace Vacancy
             {
                 case "radio": return "Radio";
                 case "newspaper": return "Newspaper";
-                case "phone": return "Phone";
+                case "phone": return PhoneCaption(state);
                 case "deskpc": return "Desk PC";
                 case "office": return "Office PC";
                 case "sign": return "Vacancy sign";
@@ -22,6 +22,15 @@ namespace Vacancy
                 case "room": return RoomCaption(state, RoomId);
                 default: return Kind;
             }
+        }
+
+        static string PhoneCaption(GameState state)
+        {
+            int calls = state?.Requests?.Count ?? 0;
+            if (calls == 1) return "Phone (1 call)";
+            if (calls > 1) return "Phone (" + calls + " calls)";
+            int chores = Requests.HousekeepingLines(state).Count;
+            return chores > 0 ? "Phone (housekeeping)" : "Phone";
         }
 
         static string RoomCaption(GameState state, int roomId)
@@ -47,6 +56,12 @@ namespace Vacancy
                 return "Unlock Room for $" + state.RoomUnlockCost();
             }
 
+            if (hovered == null) return "Room " + roomId;
+            if (hovered.Status == "needs_inspection") return "Inspect Room " + roomId;
+            if (hovered.Status == "dirty") return "Clean Room " + roomId;
+            if (hovered.Status == "needs_repair") return "Repair Room " + roomId;
+            var request = Requests.OpenForRoom(state, hovered.Id);
+            if (request != null) return "Room " + roomId + " — " + request.Label;
             return "Room " + roomId;
         }
     }

@@ -111,6 +111,22 @@ namespace Vacancy
         public bool BoughtPaper;
         public bool PaperOffered;
         public float? PaperTripIn;
+        public float? RequestRollIn;
+        public bool HasRequested;
+        public float? WalkaboutIn;
+        public bool DidWalkabout;
+        public float WalkLingerSeconds;
+    }
+
+    public sealed class GuestRequest
+    {
+        public string Id;
+        public int RoomId;
+        public string GuestName;
+        public string Kind;
+        public string Label;
+        public string SupplyId;
+        public float HoursLeft;
     }
 
     public sealed class GameState
@@ -137,6 +153,8 @@ namespace Vacancy
         public string MediaOpen;
         public readonly List<Room> Rooms = new List<Room>();
         public readonly List<string> Messages = new List<string>();
+        public readonly List<GuestRequest> Requests = new List<GuestRequest>();
+        public int NextRequestId = 1;
 
         public static GameState Create(int roomCount)
         {

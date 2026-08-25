@@ -54,6 +54,16 @@ namespace Vacancy
         public const int NewspaperPrice = 1;
         public const float GuestPaperChance = 0.22f;
         public const float GuestPaperInRoomChance = 0.14f;
+        public const float GuestRequestChance = 0.55f;
+        public const float GuestRequestMinHours = 1.2f;
+        public const float GuestRequestMaxHours = 6f;
+        public const float GuestRequestExpireHours = 5f;
+        public const int GuestRequestRepPenalty = 2;
+        public const float GuestWalkaboutChance = 0.42f;
+        public const float GuestWalkaboutMinHours = 2f;
+        public const float GuestWalkaboutMaxHours = 8f;
+        public const float GuestWalkaboutLingerMin = 6f;
+        public const float GuestWalkaboutLingerMax = 14f;
         public const float WaitPatienceHours = 4f;
         public const float StayIntervalHours = 12f;
         public const int MinStayDays = 1;
