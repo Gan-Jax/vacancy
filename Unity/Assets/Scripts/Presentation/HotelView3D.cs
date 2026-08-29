@@ -1254,8 +1254,9 @@ namespace Vacancy
             if (skipSide != "east") AddSide(name + "-E", "east", rect, doors, color, yBottom, wallHeight);
         }
 
-        void AddSide(string name, string side, Rect rect, List<Door> doors, Color color, float yBottom, float wallHeight)
+        void AddSide(string name, string side, Rect rect, List<Door> doors, Color color, float yBottom, float wallHeight = 0f)
         {
+            if (wallHeight <= 0f) wallHeight = WorldScale.WallHeight;
             var gaps = new List<Door>();
             if (doors != null)
             {
