@@ -13,6 +13,7 @@ namespace Vacancy
         HotelView3D view;
         HudView hud;
         Camera playerCam;
+        public CctvSystem Cctv { get; private set; }
         readonly GameInput input = new GameInput();
         bool bannerOpen;
         bool inspectMode;
@@ -50,6 +51,7 @@ namespace Vacancy
 
             playerCam = BuildCamera();
             view = new HotelView3D(layout, transform, playerCam);
+            Cctv = new CctvSystem(layout, transform);
             hud = new HudView(state, this, transform);
         }
 
@@ -102,24 +104,36 @@ namespace Vacancy
                 Shelter.ReinforceBarricades(state, 1);
             }
 
-            if (!state.Paused && !AnyModalOpen() && !bannerOpen)
+            if (!bannerOpen)
             {
-                var staff = StaffList();
-                Economy.AdvanceTime(state, dt, layout, staff);
-
-                var result = player.Update(input, dt, layout, state.Rooms);
-                if (result != null)
+                bool cctvLive = hud != null && hud.WatchingHallCameras;
+                if ((!state.Paused || cctvLive) && (!AnyModalOpen() || cctvLive))
                 {
-                    if (result.Type == "inspect") Economy.FinishInspection(state, result.Room);
-                    if (result.Type == "repair") Economy.FinishRepair(state, result.Room);
-                    if (result.Type == "clean") Economy.FinishCleaning(state, result.Room);
-                    result.Room.Worker = null;
+                    var staff = StaffList();
+                    Economy.AdvanceTime(state, dt, layout, staff);
+
+                    if (!cctvLive)
+                    {
+                        var result = player.Update(input, dt, layout, state.Rooms);
+                        if (result != null)
+                        {
+                            if (result.Type == "inspect") Economy.FinishInspection(state, result.Room);
+                            if (result.Type == "repair") Economy.FinishRepair(state, result.Room);
+                            if (result.Type == "clean") Economy.FinishCleaning(state, result.Room);
+                            result.Room.Worker = null;
+                        }
+
+                        bob?.Update(dt, state, layout);
+                        mary?.Update(dt, state, layout);
+
+                        if (input.InteractPressed) HandleInteract();
+                    }
+                    else
+                    {
+                        bob?.Update(dt, state, layout);
+                        mary?.Update(dt, state, layout);
+                    }
                 }
-
-                bob?.Update(dt, state, layout);
-                mary?.Update(dt, state, layout);
-
-                if (input.InteractPressed) HandleInteract();
             }
 
             view.Refresh(state, player, StaffList());
@@ -140,6 +154,7 @@ namespace Vacancy
 
         void OnDestroy()
         {
+            Cctv?.Dispose();
             Time.timeScale = 1f;
             Cursor.lockState = CursorLockMode.None;
             Cursor.visible = true;
@@ -477,9 +492,27 @@ namespace Vacancy
 
         public void ClosePc()
         {
+            SetHallCamerasOpen(false);
             state.PcOpen = false;
             hud.ResetOfficePc();
             if (!state.PauseMenuOpen && state.DeskGuest == null && string.IsNullOrEmpty(state.MediaOpen)) state.Paused = false;
+        }
+
+        public void SetHallCamerasOpen(bool open)
+        {
+            Cctv?.SetWatching(open && state != null && state.PcOpen);
+            if (state == null || !state.PcOpen) return;
+            state.Paused = !open;
+        }
+
+        public void SelectHallCamera(int roomId)
+        {
+            Cctv?.SelectRoom(roomId);
+        }
+
+        public void SelectHallCameraDelta(int delta)
+        {
+            Cctv?.SelectNext(delta);
         }
 
         public void PlacePcOrder(Dictionary<string, int> quantities)
@@ -609,6 +642,7 @@ namespace Vacancy
 
         void CloseOpenUi()
         {
+            SetHallCamerasOpen(false);
             state.PcOpen = false;
             state.MediaOpen = null;
             state.DeskGuest = null;

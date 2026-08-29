@@ -183,7 +183,7 @@ namespace Vacancy
             }
 
             state.AddLog("Welcome to the roadside inn. Check guests in and out at the desk PC.");
-            state.AddLog("Use the office PC to order supplies or hire help.");
+            state.AddLog("Use the office PC to order supplies, hire help, or watch the hall cameras.");
             return state;
         }
 

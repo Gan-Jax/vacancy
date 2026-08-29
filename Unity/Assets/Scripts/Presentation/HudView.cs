@@ -32,6 +32,11 @@ namespace Vacancy
         readonly GameObject pcMenuPage;
         readonly GameObject pcSuppliesPage;
         readonly GameObject pcHirePage;
+        readonly GameObject pcCamerasPage;
+        readonly Text pcCamCaption;
+        readonly List<Button> pcCamButtons = new List<Button>();
+        readonly Color pcCamIdle = new Color(0.22f, 0.29f, 0.4f, 1f);
+        readonly Color pcCamLive = new Color(0.38f, 0.22f, 0.2f, 1f);
         readonly Text pcStock;
         readonly Text pcPending;
         readonly Text pcTotal;
@@ -169,13 +174,14 @@ namespace Vacancy
             logBox = MakeScrollBox(logFold.Body, Vector2.zero, new Vector2(508, 216));
             Stretch(logBox.Root.GetComponent<RectTransform>(), 0, 0, 0, 0);
 
-            pcPanel = Panel("OfficePc", canvasGo.transform, new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(580, 560));
+            pcPanel = Panel("OfficePc", canvasGo.transform, new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(660, 620));
             pcMenuPage = PageOn(pcPanel.transform, "Menu");
-            MakeText(pcMenuPage.transform, "Office PC", new Vector2(0, 200), 22, Palette.Accent, 520);
-            MakeText(pcMenuPage.transform, "Two things this computer does.", new Vector2(0, 150), 14, Palette.Muted, 520);
-            ButtonOn(pcMenuPage.transform, "1. Order supplies", new Vector2(0, 40), () => ShowOfficePage("supplies"), 280, 44);
-            ButtonOn(pcMenuPage.transform, "2. Hire help", new Vector2(0, -24), () => ShowOfficePage("hire"), 280, 44);
-            ButtonOn(pcMenuPage.transform, "Close", new Vector2(0, -220), () => game.ClosePc(), 140, 32);
+            MakeText(pcMenuPage.transform, "Office PC", new Vector2(0, 220), 22, Palette.Accent, 600);
+            MakeText(pcMenuPage.transform, "Supplies, hiring, and the hall cameras.", new Vector2(0, 170), 14, Palette.Muted, 600);
+            ButtonOn(pcMenuPage.transform, "1. Order supplies", new Vector2(0, 70), () => ShowOfficePage("supplies"), 280, 44);
+            ButtonOn(pcMenuPage.transform, "2. Hire help", new Vector2(0, 10), () => ShowOfficePage("hire"), 280, 44);
+            ButtonOn(pcMenuPage.transform, "3. Hall cameras", new Vector2(0, -50), () => ShowOfficePage("cameras"), 280, 44);
+            ButtonOn(pcMenuPage.transform, "Close", new Vector2(0, -250), () => game.ClosePc(), 140, 32);
 
             pcSuppliesPage = PageOn(pcPanel.transform, "Supplies");
             MakeText(pcSuppliesPage.transform, "Order supplies", new Vector2(0, 250), 20, Palette.Accent, 520);
@@ -212,6 +218,32 @@ namespace Vacancy
                 280,
                 44);
             ButtonOn(pcHirePage.transform, "Back", new Vector2(0, -220), () => ShowOfficePage("menu"), 140, 32);
+
+            pcCamerasPage = PageOn(pcPanel.transform, "Cameras");
+            MakeText(pcCamerasPage.transform, "Hall cameras", new Vector2(0, 280), 20, Palette.Accent, 600);
+            MakeText(pcCamerasPage.transform, "Covered walk, looking at each stay-room door.", new Vector2(0, 246), 13, Palette.Muted, 600);
+            var bezel = new GameObject("FeedBezel", typeof(RectTransform), typeof(Image));
+            bezel.transform.SetParent(pcCamerasPage.transform, false);
+            var bezelRt = bezel.GetComponent<RectTransform>();
+            bezelRt.anchorMin = bezelRt.anchorMax = new Vector2(0.5f, 0.5f);
+            bezelRt.anchoredPosition = new Vector2(0, 132);
+            bezelRt.sizeDelta = new Vector2(532, 212);
+            bezel.GetComponent<Image>().color = new Color(0.05f, 0.06f, 0.08f, 1f);
+            var feedGo = new GameObject("Feed", typeof(RectTransform), typeof(RawImage));
+            feedGo.transform.SetParent(bezel.transform, false);
+            var feedRt = feedGo.GetComponent<RectTransform>();
+            Stretch(feedRt, 6, 6, 6, 6);
+            var feedImage = feedGo.GetComponent<RawImage>();
+            feedImage.texture = game.Cctv != null ? game.Cctv.Feed : null;
+            feedImage.color = new Color(0.72f, 1f, 0.72f, 1f);
+            pcCamCaption = MakeText(pcCamerasPage.transform, "CAM 01", new Vector2(0, 14), 13, Palette.Text, 600);
+            pcCamCaption.alignment = TextAnchor.MiddleCenter;
+            ButtonOn(pcCamerasPage.transform, "Prev", new Vector2(-200, -24), () => game.SelectHallCameraDelta(-1), 90, 30);
+            ButtonOn(pcCamerasPage.transform, "Next", new Vector2(200, -24), () => game.SelectHallCameraDelta(1), 90, 30);
+            MakeText(pcCamerasPage.transform, "1-12 ground   ·   13-24 upper", new Vector2(0, -50), 12, Palette.Muted, 600);
+            BuildCameraButtons(pcCamerasPage.transform);
+            ButtonOn(pcCamerasPage.transform, "Back", new Vector2(0, -276), () => ShowOfficePage("menu"), 140, 32);
+
             pcPanel.SetActive(false);
             ShowOfficePage("menu");
 
@@ -495,6 +527,7 @@ namespace Vacancy
             }
 
             if (state.PcOpen && officePage == "supplies") RefreshPc();
+            if (state.PcOpen && officePage == "cameras") RefreshCctv();
             pcPanel.SetActive(state.PcOpen);
 
             if (state.DeskGuest != null) RefreshDesk();
@@ -1104,12 +1137,50 @@ namespace Vacancy
             ShowOfficePage("menu");
         }
 
+        public bool WatchingHallCameras => state != null && state.PcOpen && officePage == "cameras";
+
         void ShowOfficePage(string page)
         {
             officePage = page;
             if (pcMenuPage != null) pcMenuPage.SetActive(page == "menu");
             if (pcSuppliesPage != null) pcSuppliesPage.SetActive(page == "supplies");
             if (pcHirePage != null) pcHirePage.SetActive(page == "hire");
+            if (pcCamerasPage != null) pcCamerasPage.SetActive(page == "cameras");
+            game.SetHallCamerasOpen(page == "cameras");
+            if (page == "cameras") RefreshCctv();
+        }
+
+        void BuildCameraButtons(Transform parent)
+        {
+            int count = game.Cctv != null && game.Cctv.RoomCount > 0
+                ? game.Cctv.RoomCount
+                : GameConfig.MaxRooms;
+            const int cols = 6;
+            const float cellW = 66f;
+            const float cellH = 30f;
+            float originX = -((cols - 1) * cellW) * 0.5f;
+            for (int i = 0; i < count; i++)
+            {
+                int id = i + 1;
+                int col = i % cols;
+                int row = i / cols;
+                float x = originX + col * cellW;
+                float y = -90f - row * cellH;
+                string label = id <= 12 ? id.ToString() : $"{id}";
+                var button = ButtonOn(parent, label, new Vector2(x, y), () => game.SelectHallCamera(id), 58, 26);
+                pcCamButtons.Add(button);
+            }
+        }
+
+        void RefreshCctv()
+        {
+            if (pcCamCaption != null) pcCamCaption.text = game.Cctv != null ? game.Cctv.Caption(state) : "NO SIGNAL";
+            int selected = game.Cctv != null ? game.Cctv.SelectedRoomId : 0;
+            for (int i = 0; i < pcCamButtons.Count; i++)
+            {
+                var image = pcCamButtons[i].GetComponent<Image>();
+                if (image != null) image.color = i + 1 == selected ? pcCamLive : pcCamIdle;
+            }
         }
 
         Foldout MakeFoldout(

@@ -338,7 +338,7 @@ namespace Vacancy
             }
 
             if (Economy.FirstAtDesk(state) != null) return "Press E on the desk PC to check them in";
-            return "E desk PC · E radio / newspaper box · E office PC (supplies / hire) · V sign · Esc pause";
+            return "E desk PC · E radio / newspaper box · E office PC (supplies / hire / cameras) · V sign · Esc pause";
         }
 
         static Sprite MakeSquare()

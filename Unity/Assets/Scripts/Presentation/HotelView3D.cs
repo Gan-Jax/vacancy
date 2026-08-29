@@ -1784,7 +1784,7 @@ namespace Vacancy
             }
 
             if (Economy.FirstAtDesk(state) != null) return "Press E on the desk PC to check them in";
-            return "Hold RMB to look · WASD walk · E interact · X pin · Esc pause · office door behind the desk to the basement";
+            return "Hold RMB to look · WASD walk · E interact · X pin · Esc pause · office PC has hall cameras";
         }
 
         static Mesh BuildCube()
