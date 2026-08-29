@@ -55,6 +55,8 @@ At the desk, **E** opens the arrival review. Ask from the radio or paper, then a
 | canvas drawing | `Assets/Scripts/Presentation/HotelView3D.cs` (2D `HotelView.cs` kept as reference) |
 | HTML HUD | `Assets/Scripts/Presentation/HudView.cs` |
 
+How stages should introduce systems (and how that differs from story acts) is stored in [`STAGE_JOURNEY.md`](STAGE_JOURNEY.md). Play Stage 1 as the motel until a later pass remaps the gates.
+
 Balance numbers are the same. Tweak `GameConfig.cs` the way you used to tweak `config.js`.
 
 This is **not** Project RM. Namespace is `Vacancy`. Product name is Vacancy. The building data matches RM's generated hotel; the game on top of it (story, arrivals, radio, shelter) is Vacancy only.

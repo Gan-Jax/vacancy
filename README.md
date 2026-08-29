@@ -40,6 +40,10 @@ Or use the Live Server extension in Cursor: right-click `index.html` →
 Debug buttons next to Cash: **+$500** and **+1 day** (the day skip is how you
 reach the later acts without waiting).
 
+The **stage** journey (when systems become the job) is stored in
+[`Unity/STAGE_JOURNEY.md`](Unity/STAGE_JOURNEY.md). Acts below are the older
+story-label table; they do not match the new stage list until the remap ships.
+
 ## The five acts
 
 Acts advance on **keystone events**. Each keystone needs a day threshold *and*
