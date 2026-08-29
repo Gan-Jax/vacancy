@@ -199,8 +199,17 @@ namespace Vacancy
         {
             const float w = 16f;
             const float h = 14f;
-            float x = 12f * WorldScale.UnitsPerMeter;
-            float y = 65f * WorldScale.UnitsPerMeter;
+            // Used to be a fixed 12m / 65m world point. That sat just outside
+            // the lobby south door, under the porte-cochère and a little east
+            // of the opening. Growing the wings left the number in the west
+            // walk, so keep the same offset from the lobby instead.
+            float x = floor.Lobby.X + 240f;
+            float y = floor.Lobby.Y + floor.Lobby.H + 10f;
+            if (floor.PorteCochere.W > 0f)
+            {
+                x = Geometry.Clamp(x, floor.PorteCochere.X + w, floor.PorteCochere.X + floor.PorteCochere.W - w);
+                y = Geometry.Clamp(y, floor.PorteCochere.Y + h, floor.PorteCochere.Y + floor.PorteCochere.H - h);
+            }
 
             if (!OnLotOrWalk(floor, x, y) && grid != null)
             {
