@@ -113,20 +113,52 @@ namespace Vacancy
                 return Navigation.FindRoute(fromGrid, from, to, permits, radius);
             }
 
-            Point fromPortal = fromFloor < 0 ? layout.StairsBottom : layout.StairsTop;
-            Point toPortal = toFloor < 0 ? layout.StairsBottom : layout.StairsTop;
-            var first = Navigation.FindRoute(fromGrid, from, fromPortal, permits, radius);
-            var second = Navigation.FindRoute(toGrid, toPortal, to, permits, radius);
-            if (first == null || second == null) return null;
+            if (System.Math.Abs(fromFloor - toFloor) > 1)
+            {
+                int mid = fromFloor < toFloor ? fromFloor + 1 : fromFloor - 1;
+                Point midPoint = mid < 0 ? layout.StairsBottom : mid > 0 ? layout.UpperStairsUpper : layout.StairsTop;
+                var first = FindRouteAcross(layout, from, midPoint, fromFloor, mid, permits, radius);
+                var second = FindRouteAcross(layout, midPoint, to, mid, toFloor, permits, radius);
+                if (first == null || second == null) return null;
+                var hop = new List<Point>(first.Count + second.Count);
+                hop.AddRange(first);
+                hop.AddRange(second);
+                return hop;
+            }
 
-            var combined = new List<Point>(first.Count + second.Count);
-            combined.AddRange(first);
-            combined.AddRange(second);
+            Point fromPortal;
+            Point toPortal;
+            if (fromFloor < 0 || toFloor < 0)
+            {
+                fromPortal = fromFloor < 0 ? layout.StairsBottom : layout.StairsTop;
+                toPortal = toFloor < 0 ? layout.StairsBottom : layout.StairsTop;
+            }
+            else
+            {
+                fromPortal = fromFloor > 0 ? layout.UpperStairsUpper : layout.UpperStairsGround;
+                toPortal = toFloor > 0 ? layout.UpperStairsUpper : layout.UpperStairsGround;
+            }
+
+            var firstLeg = Navigation.FindRoute(fromGrid, from, fromPortal, permits, radius);
+            var secondLeg = Navigation.FindRoute(toGrid, toPortal, to, permits, radius);
+            if (firstLeg == null || secondLeg == null) return null;
+
+            var combined = new List<Point>(firstLeg.Count + secondLeg.Count);
+            combined.AddRange(firstLeg);
+            combined.AddRange(secondLeg);
             return combined;
         }
 
         public static List<Point> PathToRoomDoor(HotelLayout layout, float fromX, float fromY, int roomId, PathOptions options = null)
         {
+            options = options ?? new PathOptions();
+            int floor = layout.RoomFloor(roomId);
+            options.ToFloor = floor;
+            if (floor != 0)
+            {
+                return FindPath(layout, fromX, fromY, layout.RoomDoor(roomId), options);
+            }
+
             return PathAlongCourt(layout, fromX, fromY, layout.RoomDoor(roomId), options);
         }
 
@@ -141,6 +173,11 @@ namespace Vacancy
         {
             options = options ?? new PathOptions();
             if (options.ToFloor == null) options.ToFloor = 0;
+            if ((options.FromFloor ?? 0) != 0 || (options.ToFloor ?? 0) != 0)
+            {
+                return FindPath(layout, fromX, fromY, dest, options);
+            }
+
             if (layout?.Floor == null || !layout.Floor.OutdoorCourt)
             {
                 return FindPath(layout, fromX, fromY, dest, options);
@@ -298,7 +335,8 @@ namespace Vacancy
                         Rooms = rooms,
                         AllowRoomId = allowRoomId,
                         Radius = entity.Radius,
-                        FromFloor = entity.FloorLevel
+                        FromFloor = entity.FloorLevel,
+                        ToFloor = entity.GoalFloor
                     });
                     return false;
                 }
@@ -331,6 +369,7 @@ namespace Vacancy
         float StallSeconds { get; set; }
         int FloorLevel { get; set; }
         float FootY { get; set; }
+        int GoalFloor { get; set; }
     }
 
     public sealed class PathOptions

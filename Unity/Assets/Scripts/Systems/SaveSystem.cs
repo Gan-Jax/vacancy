@@ -85,6 +85,9 @@ namespace Vacancy
                     guest.X = dest.X;
                     guest.Y = dest.Y;
                     guest.Nav = null;
+                    guest.FloorLevel = layout.RoomFloor(guest.RoomId);
+                    guest.GoalFloor = guest.FloorLevel;
+                    layout.UpdateElevation(guest);
                 }
             }
 

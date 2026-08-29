@@ -34,6 +34,7 @@ namespace Vacancy
         public float StallSeconds { get; set; }
         public int FloorLevel { get; set; }
         public float FootY { get; set; }
+        public int GoalFloor { get; set; }
 
         public StaffNpc(StaffProfile profile, Point home)
         {
@@ -69,8 +70,16 @@ namespace Vacancy
             return new PathOptions { Radius = Radius, FromFloor = FloorLevel, ToFloor = 0 };
         }
 
+        PathOptions RoomJobOptions(HotelLayout layout, int roomId)
+        {
+            int floor = layout.RoomFloor(roomId);
+            GoalFloor = floor;
+            return new PathOptions { Radius = Radius, FromFloor = FloorLevel, ToFloor = floor };
+        }
+
         public List<Point> PathHome(HotelLayout layout)
         {
+            GoalFloor = -1;
             return Pathing.FindPath(layout, X, Y, HomePoint(layout), HomePathOptions());
         }
 
@@ -129,6 +138,7 @@ namespace Vacancy
         public void BeginPaydayTrip(HotelLayout layout)
         {
             TargetRoom = null;
+            GoalFloor = 0;
             Path = Pathing.PathToDeskHall(layout, X, Y, GroundPathOptions());
             Phase = "to_desk";
         }
@@ -234,7 +244,7 @@ namespace Vacancy
                 if (TargetRoom != null)
                 {
                     Phase = "to_door";
-                    Path = Pathing.PathToRoomDoor(layout, X, Y, TargetRoom.Id, GroundPathOptions());
+                    Path = Pathing.PathToRoomDoor(layout, X, Y, TargetRoom.Id, RoomJobOptions(layout, TargetRoom.Id));
                 }
                 else if (Phase != "idle" && Phase != "to_closet")
                 {
@@ -271,7 +281,7 @@ namespace Vacancy
             {
                 if (Path.Count == 0)
                 {
-                    Path = Pathing.PathToRoomDoor(layout, X, Y, TargetRoom.Id, GroundPathOptions());
+                    Path = Pathing.PathToRoomDoor(layout, X, Y, TargetRoom.Id, RoomJobOptions(layout, TargetRoom.Id));
                 }
 
                 if (Pathing.FollowPath(this, dt, state.Rooms, layout, null, speed))
@@ -295,6 +305,9 @@ namespace Vacancy
                 Pathing.SteerTo(this, center.X, center.Y, dt, state.Rooms, layout, TargetRoom.Id, speed);
                 if (Geometry.Dist(X, Y, center.X, center.Y) < 26)
                 {
+                    FloorLevel = layout.RoomFloor(TargetRoom.Id);
+                    GoalFloor = FloorLevel;
+                    layout.UpdateElevation(this);
                     var room = TargetRoom;
                     if (room.Worker != null)
                     {

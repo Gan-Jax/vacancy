@@ -50,6 +50,7 @@ namespace Vacancy
         public float StallSeconds { get; set; }
         public int FloorLevel { get; set; }
         public float FootY { get; set; }
+        public int GoalFloor { get; set; }
 
         public PlayerActor(float x, float y)
         {
@@ -270,10 +271,12 @@ namespace Vacancy
 
         bool NearRoom(Room room, HotelLayout layout)
         {
-            if (room == null || layout?.RoomCenters == null) return false;
-            if (room.Id < 1 || room.Id > layout.RoomCenters.Count) return false;
-            var center = layout.RoomCenters[room.Id - 1];
-            return Geometry.Dist(X, Y, center.X, center.Y) < 88f;
+            if (room == null || layout?.Rooms == null) return false;
+            if (room.Id < 1 || room.Id > layout.Rooms.Count) return false;
+            var planned = layout.Rooms[room.Id - 1];
+            if (planned.Level != FloorLevel) return false;
+            if (planned.Rect.Contains(X, Y, -24f)) return true;
+            return Geometry.Dist(X, Y, planned.Approach.X, planned.Approach.Y) < 52f;
         }
     }
 }

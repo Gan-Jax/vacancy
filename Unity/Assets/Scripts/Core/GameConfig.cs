@@ -75,10 +75,10 @@ namespace Vacancy
         public const int HireMaryCost = 120;
         public const int StaffDailyWage = 10;
         public const int StaffPayPeriodDays = 7;
-        public const int MaxRooms = 12;
+        public const int MaxRooms = 24;
         public const int StartingUnlockedRooms = 3;
-        public const float RoomWidth = 118f;
-        public const float RoomHeight = 92f;
+        public const float RoomWidth = 240f;
+        public const float RoomHeight = 180f;
         public const float InventoryDeliveryHours = 24f;
 
         public static readonly Dictionary<string, InventoryItemDef> InventoryItems =

@@ -19,6 +19,7 @@ namespace Vacancy
         public Rect Lobby;
         public Rect Basement;
         public Rect Stairs;
+        public Rect UpperStairs;
         public OfficeSpot Office;
         public DeskSpot FrontDesk;
         public Dictionary<string, DepartmentSpot> Departments;
@@ -30,7 +31,11 @@ namespace Vacancy
         public Point Spawn;
         public Point StairsTop;
         public Point StairsBottom;
+        public Point UpperStairsGround;
+        public Point UpperStairsUpper;
         public NavGrid BasementGrid;
+        public NavGrid UpperGrid;
+        public Rect UpperWalk;
         public Rect DriveSouth;
         public Rect PorteCochere;
 
@@ -54,8 +59,10 @@ namespace Vacancy
             var building = floor.Bounds;
             var navGrid = Navigation.Build(floor);
             var basementGrid = Navigation.Build(floor, -1, floor.Basement.W > 0 ? floor.Basement : floor.Lobby);
+            var upperGrid = Navigation.Build(floor, 1);
             var desk = floor.FrontDesk;
             var stairs = floor.Stairs;
+            var upperStairs = floor.UpperStairs;
             var layout = new HotelLayout
             {
                 Width = width,
@@ -66,6 +73,7 @@ namespace Vacancy
                 Floor = floor,
                 NavGrid = navGrid,
                 BasementGrid = basementGrid,
+                UpperGrid = upperGrid,
                 Tile = floor.Tile,
                 Rooms = floor.Rooms,
                 RoomCount = floor.Rooms.Count,
@@ -74,6 +82,7 @@ namespace Vacancy
                 Lobby = floor.Lobby,
                 Basement = floor.Basement,
                 Stairs = stairs,
+                UpperStairs = upperStairs,
                 Office = floor.Office,
                 FrontDesk = desk,
                 Departments = floor.Departments,
@@ -90,10 +99,17 @@ namespace Vacancy
                     : new Point(desk.X, desk.Y),
                 StairsBottom = stairs.W > 0
                     ? new Point(stairs.X + floor.Tile * 2.5f, stairs.Center.Y)
+                    : new Point(desk.X, desk.Y),
+                UpperStairsGround = upperStairs.W > 0
+                    ? new Point(upperStairs.Center.X, upperStairs.Y + upperStairs.H + floor.Tile * 2f)
+                    : new Point(desk.X, desk.Y),
+                UpperStairsUpper = upperStairs.W > 0
+                    ? new Point(upperStairs.Center.X, upperStairs.Y - floor.Tile * 2f)
                     : new Point(desk.X, desk.Y)
             };
 
             foreach (var room in floor.Rooms) layout.RoomCenters.Add(room.Center);
+            layout.UpperWalk = UpperWalkBounds(floor, upperStairs);
             layout.BuildStalls();
 
             if (floor.Departments.TryGetValue("housekeeping", out var housekeeping))
@@ -115,6 +131,12 @@ namespace Vacancy
         {
             if (roomId < 1 || roomId > Rooms.Count) return DeskApproach();
             return Rooms[roomId - 1].Approach;
+        }
+
+        public int RoomFloor(int roomId)
+        {
+            if (roomId < 1 || roomId > Rooms.Count) return 0;
+            return Rooms[roomId - 1].Level;
         }
 
         public Point RoomInterior(int roomId)
@@ -527,12 +549,14 @@ namespace Vacancy
 
         public NavGrid GridFor(int floorLevel)
         {
+            if (floorLevel > 0 && UpperGrid != null) return UpperGrid;
             if (floorLevel < 0 && BasementGrid != null) return BasementGrid;
             return NavGrid;
         }
 
         public Rect WalkRect(int floorLevel)
         {
+            if (floorLevel > 0 && UpperWalk.W > 0) return UpperWalk;
             if (floorLevel < 0 && Basement.W > 0) return Basement;
             return WalkBounds.W > 0 ? WalkBounds : Building;
         }
@@ -542,11 +566,23 @@ namespace Vacancy
             return Stairs.W > 0 && Stairs.Contains(x, y, Tile * 0.2f);
         }
 
+        public bool InUpperStairs(float x, float y)
+        {
+            return UpperStairs.W > 0 && UpperStairs.Contains(x, y, Tile * 0.2f);
+        }
+
         public float StairFootY(float x, float y)
         {
             if (!InStairs(x, y) || Stairs.W <= Tile) return 0f;
             float t = Geometry.Clamp((x - Stairs.X) / Stairs.W, 0f, 1f);
             return -(1f - t) * WorldScale.FloorDepth;
+        }
+
+        public float UpperStairFootY(float x, float y)
+        {
+            if (!InUpperStairs(x, y) || UpperStairs.H <= Tile) return 0f;
+            float t = Geometry.Clamp((y - UpperStairs.Y) / UpperStairs.H, 0f, 1f);
+            return (1f - t) * WorldScale.UpperFloorY;
         }
 
         public int GuessFloor(Point point)
@@ -563,9 +599,16 @@ namespace Vacancy
             {
                 foreach (var area in Floor.Areas)
                 {
-                    if (area.Level >= 0) continue;
-                    if (area.Kind == AreaKind.Basement) continue;
-                    if (area.Rect.Contains(point.X, point.Y)) return -1;
+                    if (area.Level < 0)
+                    {
+                        if (area.Kind == AreaKind.Basement) continue;
+                        if (area.Rect.Contains(point.X, point.Y)) return -1;
+                    }
+                    else if (area.Level > 0 && area.Kind == AreaKind.GuestRoom &&
+                             area.Rect.Contains(point.X, point.Y))
+                    {
+                        return 1;
+                    }
                 }
             }
 
@@ -582,7 +625,17 @@ namespace Vacancy
                 return;
             }
 
-            entity.FootY = entity.FloorLevel < 0 ? -WorldScale.FloorDepth : 0f;
+            if (InUpperStairs(entity.X, entity.Y) &&
+                (entity.FloorLevel >= 1 || entity.GoalFloor >= 1 || entity is PlayerActor))
+            {
+                entity.FootY = UpperStairFootY(entity.X, entity.Y);
+                entity.FloorLevel = entity.FootY > WorldScale.UpperFloorY * 0.45f ? 1 : 0;
+                return;
+            }
+
+            if (entity.FloorLevel > 0) entity.FootY = WorldScale.UpperFloorY;
+            else if (entity.FloorLevel < 0) entity.FootY = -WorldScale.FloorDepth;
+            else entity.FootY = 0f;
         }
 
         public string AreaLabelAt(float x, float y, int floorLevel)
@@ -614,6 +667,7 @@ namespace Vacancy
             }
 
             Consider("stairs", Stairs);
+            Consider("upper stairs", UpperStairs);
             if (floorLevel >= 0)
             {
                 if (Office != null) Consider("office", Office.Rect);
@@ -674,6 +728,15 @@ namespace Vacancy
                 }
             }
 
+            if (UpperGrid != null && UpperStairs.W > 0)
+            {
+                problems.AddRange(Navigation.ValidateFloor(UpperGrid, Floor, UpperStairsUpper));
+                if (Navigation.FindRoute(UpperGrid, UpperStairsUpper, UpperStairsUpper, null, 12f) == null)
+                {
+                    problems.Add("Upper stair landing is blocked");
+                }
+            }
+
             if (BasementGrid == null || Stairs.W <= 0) return problems;
 
             var permits = new HashSet<string> { "office" };
@@ -697,6 +760,39 @@ namespace Vacancy
             }
 
             return problems;
+        }
+
+        static Rect UpperWalkBounds(BuiltFloor floor, Rect stairs)
+        {
+            float x0 = stairs.W > 0 ? stairs.X : 0f;
+            float y0 = stairs.W > 0 ? stairs.Y : 0f;
+            float x1 = stairs.W > 0 ? stairs.X + stairs.W : 0f;
+            float y1 = stairs.W > 0 ? stairs.Y + stairs.H : 0f;
+            bool any = stairs.W > 0;
+            if (floor?.Areas != null)
+            {
+                foreach (var area in floor.Areas)
+                {
+                    if (area.Level != 1 || area.Rect.W <= 0f) continue;
+                    if (!any)
+                    {
+                        x0 = area.Rect.X;
+                        y0 = area.Rect.Y;
+                        x1 = area.Rect.X + area.Rect.W;
+                        y1 = area.Rect.Y + area.Rect.H;
+                        any = true;
+                        continue;
+                    }
+
+                    x0 = System.Math.Min(x0, area.Rect.X);
+                    y0 = System.Math.Min(y0, area.Rect.Y);
+                    x1 = System.Math.Max(x1, area.Rect.X + area.Rect.W);
+                    y1 = System.Math.Max(y1, area.Rect.Y + area.Rect.H);
+                }
+            }
+
+            if (!any) return default;
+            return new Rect(x0 - 8f, y0 - 8f, x1 - x0 + 16f, y1 - y0 + 16f);
         }
     }
 

@@ -684,7 +684,7 @@ namespace Vacancy
             cam.orthographic = false;
             cam.fieldOfView = 72f;
             cam.nearClipPlane = 0.08f;
-            cam.farClipPlane = 120f;
+            cam.farClipPlane = 220f;
             cam.backgroundColor = Palette.HudBg;
             cam.clearFlags = CameraClearFlags.SolidColor;
             if (cam.GetComponent<AudioListener>() == null)
@@ -707,7 +707,9 @@ namespace Vacancy
             {
                 if (IsCharacterHit(hit.collider)) continue;
                 WorldScale.FromWorld(hit.point, out float x, out float y);
-                int floor = hit.point.y < -WorldScale.FloorDepth * 0.45f ? -1 : 0;
+                int floor = hit.point.y > WorldScale.UpperFloorY * 0.45f
+                    ? 1
+                    : hit.point.y < -WorldScale.FloorDepth * 0.45f ? -1 : 0;
                 hover = HotelLayout.FormatPin(layout.AreaLabelAt(x, y, floor), x, y);
                 world = hit.point + Vector3.up * 0.04f;
                 if (clicked && (hud == null || !hud.PointerOverHud()))

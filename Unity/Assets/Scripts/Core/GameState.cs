@@ -62,6 +62,7 @@ namespace Vacancy
         public float StallSeconds { get; set; }
         public int FloorLevel { get; set; }
         public float FootY { get; set; }
+        public int GoalFloor { get; set; }
         public string ArrivePhase;
         public int StallIndex = -1;
         public string CarColor;
@@ -106,6 +107,7 @@ namespace Vacancy
         public float StallSeconds { get; set; }
         public int FloorLevel { get; set; }
         public float FootY { get; set; }
+        public int GoalFloor { get; set; }
         public int StallIndex = -1;
         public string CarColor;
         public bool BoughtPaper;

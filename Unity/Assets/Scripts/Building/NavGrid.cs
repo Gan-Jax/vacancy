@@ -263,6 +263,11 @@ namespace Vacancy
                 for (int col = 0; col < grid.Cols; col++)
                 {
                     var center = CellCenter(grid, col, row);
+                    if (floor.UpperStairs.W > 0f && floor.UpperStairs.Contains(center.X, center.Y))
+                    {
+                        continue;
+                    }
+
                     if (floor.CornerMass.W > 0f && floor.CornerMass.Contains(center.X, center.Y))
                     {
                         BlockCell(grid, col, row);
@@ -555,6 +560,7 @@ namespace Vacancy
             var problems = new List<string>();
             foreach (var room in floor.Rooms)
             {
+                if (room.Level != grid.Level) continue;
                 if (IsCircleBlocked(grid, room.Approach.X, room.Approach.Y, 8f, null))
                 {
                     problems.Add($"Room {room.Id} doorway is walled in");
@@ -585,17 +591,21 @@ namespace Vacancy
                 }
             }
 
-            if (floor.Office != null && FindRoute(grid, from, floor.Office.Approach, null, 12f) == null)
+            if (grid.Level == 0 && floor.Office != null &&
+                FindRoute(grid, from, floor.Office.Approach, null, 12f) == null)
             {
                 problems.Add("Office door is unreachable");
             }
 
-            foreach (var dept in floor.Departments.Values)
+            if (grid.Level == 0)
             {
-                if (DepartmentIsBasement(floor, dept)) continue;
-                if (FindRoute(grid, from, new Point(dept.X, dept.Y), null, 12f) == null)
+                foreach (var dept in floor.Departments.Values)
                 {
-                    problems.Add($"{dept.Label} is unreachable");
+                    if (DepartmentIsBasement(floor, dept)) continue;
+                    if (FindRoute(grid, from, new Point(dept.X, dept.Y), null, 12f) == null)
+                    {
+                        problems.Add($"{dept.Label} is unreachable");
+                    }
                 }
             }
 

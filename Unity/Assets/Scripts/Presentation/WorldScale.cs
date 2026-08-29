@@ -15,6 +15,7 @@ namespace Vacancy
         public const float FloorDepth = 3.2f;
         public const float LookSensitivity = 2.4f;
         public static float BasementFloorY => -FloorDepth;
+        public static float UpperFloorY => FloorDepth;
 
         public static Vector3 ToWorld(float layoutX, float layoutY, float height = 0f)
         {

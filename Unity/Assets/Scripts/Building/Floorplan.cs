@@ -62,6 +62,7 @@ namespace Vacancy
         public Point Door;
         public Door DoorOpening;
         public Point Approach;
+        public int Level;
     }
 
     public sealed class DepartmentSpot
@@ -112,6 +113,7 @@ namespace Vacancy
         public Rect Parking;
         public Rect Basement;
         public Rect Stairs;
+        public Rect UpperStairs;
         public OfficeSpot Office;
         public DeskSpot FrontDesk;
         public Dictionary<string, DepartmentSpot> Departments = new Dictionary<string, DepartmentSpot>();
@@ -131,11 +133,11 @@ namespace Vacancy
         public static readonly FloorSpec FlagshipGround = new FloorSpec
         {
             Id = "ground",
-            Name = "Ground floor",
+            Name = "Inn",
             Level = 0,
             Tile = 10,
             Edge = 20,
-            SideCorridor = 50,
+            SideCorridor = 100,
             DoorWidth = 40,
             RoomSize = new Point(GameConfig.RoomWidth, GameConfig.RoomHeight),
             MaxRoomsPerRow = 8,
@@ -179,7 +181,7 @@ namespace Vacancy
             // Facade along the courtyard walk; depth back from the door.
             float roomAlong = Down(spec.RoomSize.X);
             float roomDepth = Down(spec.RoomSize.Y);
-            float walkW = Down(spec.SideCorridor > 0 ? spec.SideCorridor : 50f);
+            float walkW = Down(spec.SideCorridor > 0 ? spec.SideCorridor : 100f);
             float originX = Down(40);
             float originY = Down(40);
             const int westCount = 8;
@@ -244,6 +246,8 @@ namespace Vacancy
 
             AddOpenArea(floor, "walk-north", AreaKind.Walkway, "Covered walk", walkNorth);
             AddOpenArea(floor, "walk-west", AreaKind.Walkway, "Covered walk", walkWest);
+            AddOpenArea(floor, "walk-north-up", AreaKind.Walkway, "Upper walk", walkNorth, 1);
+            AddOpenArea(floor, "walk-west-up", AreaKind.Walkway, "Upper walk", walkWest, 1);
             AddOpenArea(floor, "parking", AreaKind.Parking, "Parking lot", parking);
             AddOpenArea(floor, "parking-drive", AreaKind.Parking, "Drive", driveSouth);
             AddOpenArea(floor, "porte-cochere", AreaKind.Walkway, "Porte-cochère", canopy);
@@ -265,9 +269,20 @@ namespace Vacancy
                 AddGuestRoom(floor, spec, roomRect, "south", tile);
             }
 
-            var northDoor = MakeDoor(lobbyRect, "north", spec.DoorWidth, 0.42f, tile);
+            int groundRooms = floor.Rooms.Count;
+            for (int i = 0; i < groundRooms; i++)
+            {
+                var ground = floor.Rooms[i];
+                AddGuestRoom(floor, spec, ground.Rect, ground.DoorSide, tile, 1);
+            }
+
+            // West half of the walk is the stair tower; east half stays a
+            // ground-level lobby door so going to a first-floor room does not
+            // force a climb.
+            var lobbyStairGap = MakeDoor(lobbyRect, "north", spec.DoorWidth, 0.70f, tile);
+            var northDoor = MakeDoor(lobbyRect, "north", spec.DoorWidth, 0.85f, tile);
             var southDoor = MakeDoor(lobbyRect, "south", spec.DoorWidth * 2f, 0.5f, tile);
-            // Wide east opening centered on drive traffic (~y 1180) so radius-12
+            // Wide east opening centered on drive traffic so radius-12
             // guests are not sent along the solid wall to the north courtyard door.
             var eastDoor = MakeDoor(lobbyRect, "east", spec.DoorWidth * 2f, 0.65f, tile);
             floor.Areas.Add(new FloorArea
@@ -277,17 +292,44 @@ namespace Vacancy
                 Label = "Lobby",
                 Rect = lobbyRect,
                 Walls = true,
-                Doors = new List<Door> { northDoor, southDoor, eastDoor }
+                Doors = new List<Door> { lobbyStairGap, northDoor, southDoor, eastDoor }
             });
             floor.LotEntrance = OutsidePoint(northDoor, tile);
             floor.LotEntranceEast = OutsidePoint(eastDoor, tile);
             floor.LotEntranceSouth = OutsidePoint(southDoor, tile);
 
-            float officeW = Down(220);
+            float stairH = Down(80);
+            float stairFlightW = Down(System.Math.Min(50f, walkW * 0.5f));
+            var upperStairs = new Rect(walkWest.X, lobbyRect.Y, stairFlightW, stairH);
+            var upDoorSouth = MakeDoor(upperStairs, "south", spec.DoorWidth, 0.5f, tile);
+            var upDoorNorth = MakeDoor(upperStairs, "north", spec.DoorWidth, 0.5f, tile);
+            floor.Areas.Add(new FloorArea
+            {
+                Id = "stairs-up",
+                Kind = AreaKind.Stairs,
+                Label = "Upper stairs",
+                Rect = upperStairs,
+                Walls = true,
+                Doors = new List<Door> { upDoorSouth, upDoorNorth }
+            });
+            floor.Areas.Add(new FloorArea
+            {
+                Id = "stairs-up-landing",
+                Kind = AreaKind.Stairs,
+                Label = "Upper stairs",
+                Rect = upperStairs,
+                Walls = true,
+                Doors = new List<Door> { upDoorSouth, upDoorNorth },
+                Level = 1
+            });
+            floor.UpperStairs = upperStairs;
+
             float officeH = Down(90);
             float stairW = Down(80);
+            float officeLeft = lobbyRect.X + Down(16);
+            float officeW = Down(walkWest.X - tile - officeLeft);
             var backBlock = new Rect(
-                lobbyRect.X + Down((lobbyRect.W - officeW) / 2f),
+                officeLeft,
                 lobbyRect.Y + Down(16),
                 officeW,
                 officeH);
@@ -380,7 +422,7 @@ namespace Vacancy
             return floor.Parking;
         }
 
-        static void AddOpenArea(BuiltFloor floor, string id, string kind, string label, Rect rect)
+        static void AddOpenArea(BuiltFloor floor, string id, string kind, string label, Rect rect, int level = 0)
         {
             if (rect.W <= 0f || rect.H <= 0f) return;
             floor.Areas.Add(new FloorArea
@@ -388,11 +430,12 @@ namespace Vacancy
                 Id = id,
                 Kind = kind,
                 Label = label,
-                Rect = rect
+                Rect = rect,
+                Level = level
             });
         }
 
-        static void AddGuestRoom(BuiltFloor floor, FloorSpec spec, Rect roomRect, string doorSide, float tile)
+        static void AddGuestRoom(BuiltFloor floor, FloorSpec spec, Rect roomRect, string doorSide, float tile, int level = 0)
         {
             int id = floor.Rooms.Count + 1;
             var door = MakeDoor(roomRect, doorSide, spec.DoorWidth, 0.5f, tile);
@@ -405,7 +448,8 @@ namespace Vacancy
                 Rect = roomRect,
                 Walls = true,
                 Doors = new List<Door> { door },
-                RoomId = id
+                RoomId = id,
+                Level = level
             });
             floor.Rooms.Add(new PlannedRoom
             {
@@ -415,7 +459,8 @@ namespace Vacancy
                 DoorSide = door.Side,
                 Door = door.Center,
                 DoorOpening = door,
-                Approach = OutsidePoint(door, tile)
+                Approach = OutsidePoint(door, tile),
+                Level = level
             });
         }
 

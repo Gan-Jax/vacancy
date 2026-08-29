@@ -34,6 +34,7 @@ namespace Vacancy
 
             foreach (var area in layout.Floor.Areas)
             {
+                if (area.Level > 0) continue;
                 if (area.Kind == AreaKind.Corridor)
                 {
                     Quad(area.Id, area.Rect, Palette.Corridor, 0);
@@ -74,6 +75,7 @@ namespace Vacancy
 
             foreach (var planned in layout.Floor.Rooms)
             {
+                if (planned.Level > 0) continue;
                 Quad($"RoomWall-{planned.Id}", planned.Rect, Palette.Wall, 1);
                 var inner = Inset(planned.Rect, layout.Tile);
                 roomFills[planned.Id] = Quad($"RoomFill-{planned.Id}", inner, Palette.Locked, 2);

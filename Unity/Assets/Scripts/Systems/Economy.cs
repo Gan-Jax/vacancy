@@ -205,6 +205,16 @@ namespace Vacancy
             };
         }
 
+        static PathOptions StayPath(Guest guest, int toFloor)
+        {
+            return new PathOptions
+            {
+                Radius = guest != null ? guest.Radius : 11f,
+                FromFloor = guest?.FloorLevel ?? 0,
+                ToFloor = toFloor
+            };
+        }
+
         static List<Point> PathViaEntrance(GameState state, HotelLayout layout, WaitingGuest guest, Point dest)
         {
             return Pathing.PathAlongCourt(layout, guest.X, guest.Y, dest, LobbyWalkOptions(state, guest));
@@ -558,7 +568,12 @@ namespace Vacancy
                 X = spawn.X,
                 Y = spawn.Y,
                 Radius = 11,
-                Path = Pathing.PathToRoomDoor(layout, spawn.X, spawn.Y, cleanRoom.Id, new PathOptions { Radius = 11 }),
+                Path = Pathing.PathToRoomDoor(layout, spawn.X, spawn.Y, cleanRoom.Id, new PathOptions
+                {
+                    Radius = 11,
+                    FromFloor = 0,
+                    ToFloor = layout.RoomFloor(cleanRoom.Id)
+                }),
                 TargetX = dest.X,
                 TargetY = dest.Y,
                 StayDays = stayDays,
@@ -569,7 +584,8 @@ namespace Vacancy
                 StallIndex = waiting.StallIndex,
                 CarColor = waiting.CarColor,
                 BoughtPaper = waiting.BoughtPaper,
-                PaperOffered = waiting.PaperOffered
+                PaperOffered = waiting.PaperOffered,
+                GoalFloor = layout.RoomFloor(cleanRoom.Id)
             });
 
             string dayWord = stayDays == 1 ? "day" : "days";
@@ -739,6 +755,7 @@ namespace Vacancy
             guest.WaitRemainingHours = null;
             guest.Phase = "walking_to_checkout";
             guest.Nav = "exit_room";
+            guest.GoalFloor = 0;
             guest.Path.Clear();
 
             int queueIndex = -1;
@@ -785,7 +802,7 @@ namespace Vacancy
                     {
                         if (guest.Path == null || guest.Path.Count == 0)
                         {
-                            guest.Path = Pathing.PathToRoomDoor(layout, guest.X, guest.Y, guest.RoomId);
+                            guest.Path = Pathing.PathToRoomDoor(layout, guest.X, guest.Y, guest.RoomId, StayPath(guest, layout.RoomFloor(guest.RoomId)));
                         }
 
                         if (Pathing.FollowPath(guest, dt, state.Rooms, layout, null, speed))
@@ -807,9 +824,12 @@ namespace Vacancy
                         {
                             guest.X = dest.X;
                             guest.Y = dest.Y;
+                            guest.FloorLevel = layout.RoomFloor(guest.RoomId);
+                            guest.GoalFloor = guest.FloorLevel;
                             guest.Phase = "in_room";
                             guest.Nav = null;
                             guest.Path.Clear();
+                            layout.UpdateElevation(guest);
                             state.AddLog($"{guest.Name} arrived at Room {guest.RoomId}.");
                             MaybeQueueRoomPaperTrip(guest);
                             Requests.MaybeQueue(guest);
@@ -884,14 +904,14 @@ namespace Vacancy
                         if (Geometry.Dist(guest.X, guest.Y, door.X, door.Y) < 16)
                         {
                             guest.Nav = "to_desk";
-                            guest.Path = Pathing.PathGuestToDesk(layout, guest.X, guest.Y);
+                            guest.Path = Pathing.PathGuestToDesk(layout, guest.X, guest.Y, StayPath(guest, 0));
                         }
                     }
                     else if (guest.Nav == "to_desk")
                     {
                         if (guest.Path == null || guest.Path.Count == 0)
                         {
-                            guest.Path = Pathing.PathGuestToDesk(layout, guest.X, guest.Y);
+                            guest.Path = Pathing.PathGuestToDesk(layout, guest.X, guest.Y, StayPath(guest, 0));
                         }
 
                         if (Pathing.FollowPath(guest, dt, state.Rooms, layout, null, speed))
@@ -962,6 +982,7 @@ namespace Vacancy
             var dest = layout != null ? layout.WalkaboutSpot(GameRng.NextInt(0, 2)) : new Point(guest.X, guest.Y);
             guest.Phase = "walkabout";
             guest.Nav = "exit_room";
+            guest.GoalFloor = 0;
             if (guest.Path == null) guest.Path = new List<Point>();
             else guest.Path.Clear();
             guest.WalkaboutIn = 0f;
@@ -985,7 +1006,7 @@ namespace Vacancy
                 if (Geometry.Dist(guest.X, guest.Y, door.X, door.Y) < 16)
                 {
                     guest.Nav = "to_spot";
-                    guest.Path = Pathing.PathAlongCourt(layout, guest.X, guest.Y, dest);
+                    guest.Path = Pathing.PathAlongCourt(layout, guest.X, guest.Y, dest, StayPath(guest, 0));
                 }
 
                 return;
@@ -995,7 +1016,7 @@ namespace Vacancy
             {
                 if (guest.Path == null || guest.Path.Count == 0)
                 {
-                    guest.Path = Pathing.PathAlongCourt(layout, guest.X, guest.Y, dest);
+                    guest.Path = Pathing.PathAlongCourt(layout, guest.X, guest.Y, dest, StayPath(guest, 0));
                 }
 
                 if (guest.Path == null || guest.Path.Count == 0 ||
@@ -1016,7 +1037,8 @@ namespace Vacancy
                 guest.WalkLingerSeconds -= dt;
                 if (guest.WalkLingerSeconds > 0f) return;
                 guest.Nav = "to_door";
-                guest.Path = Pathing.PathToRoomDoor(layout, guest.X, guest.Y, guest.RoomId);
+                guest.GoalFloor = layout.RoomFloor(guest.RoomId);
+                guest.Path = Pathing.PathToRoomDoor(layout, guest.X, guest.Y, guest.RoomId, StayPath(guest, guest.GoalFloor));
                 return;
             }
 
@@ -1024,7 +1046,7 @@ namespace Vacancy
             {
                 if (guest.Path == null || guest.Path.Count == 0)
                 {
-                    guest.Path = Pathing.PathToRoomDoor(layout, guest.X, guest.Y, guest.RoomId);
+                    guest.Path = Pathing.PathToRoomDoor(layout, guest.X, guest.Y, guest.RoomId, StayPath(guest, guest.GoalFloor));
                 }
 
                 if (Pathing.FollowPath(guest, dt, state.Rooms, layout, null, speed))
@@ -1044,9 +1066,12 @@ namespace Vacancy
             {
                 guest.X = roomDest.X;
                 guest.Y = roomDest.Y;
+                guest.FloorLevel = layout.RoomFloor(guest.RoomId);
+                guest.GoalFloor = guest.FloorLevel;
                 guest.Phase = "in_room";
                 guest.Nav = null;
                 guest.Path.Clear();
+                layout.UpdateElevation(guest);
             }
         }
 
@@ -1067,6 +1092,7 @@ namespace Vacancy
         {
             guest.Phase = "buying_paper";
             guest.Nav = "exit_room";
+            guest.GoalFloor = 0;
             guest.Path.Clear();
             guest.PaperTripIn = 0f;
         }
@@ -1084,7 +1110,7 @@ namespace Vacancy
                 if (Geometry.Dist(guest.X, guest.Y, door.X, door.Y) < 16)
                 {
                     guest.Nav = "to_box";
-                    guest.Path = Pathing.PathToNewspaper(layout, guest.X, guest.Y);
+                    guest.Path = Pathing.PathToNewspaper(layout, guest.X, guest.Y, StayPath(guest, 0));
                 }
 
                 return;
@@ -1094,7 +1120,7 @@ namespace Vacancy
             {
                 if (guest.Path == null || guest.Path.Count == 0)
                 {
-                    guest.Path = Pathing.PathToNewspaper(layout, guest.X, guest.Y);
+                    guest.Path = Pathing.PathToNewspaper(layout, guest.X, guest.Y, StayPath(guest, 0));
                 }
 
                 if (guest.Path == null || guest.Path.Count == 0 ||
@@ -1104,7 +1130,8 @@ namespace Vacancy
                     BuyNewspaper(state, guest.Name);
                     guest.BoughtPaper = true;
                     guest.Nav = "to_door";
-                    guest.Path = Pathing.PathToRoomDoor(layout, guest.X, guest.Y, guest.RoomId);
+                    guest.GoalFloor = layout.RoomFloor(guest.RoomId);
+                    guest.Path = Pathing.PathToRoomDoor(layout, guest.X, guest.Y, guest.RoomId, StayPath(guest, guest.GoalFloor));
                 }
 
                 return;
@@ -1114,7 +1141,7 @@ namespace Vacancy
             {
                 if (guest.Path == null || guest.Path.Count == 0)
                 {
-                    guest.Path = Pathing.PathToRoomDoor(layout, guest.X, guest.Y, guest.RoomId);
+                    guest.Path = Pathing.PathToRoomDoor(layout, guest.X, guest.Y, guest.RoomId, StayPath(guest, guest.GoalFloor));
                 }
 
                 if (Pathing.FollowPath(guest, dt, state.Rooms, layout, null, speed))
@@ -1134,9 +1161,12 @@ namespace Vacancy
             {
                 guest.X = dest.X;
                 guest.Y = dest.Y;
+                guest.FloorLevel = layout.RoomFloor(guest.RoomId);
+                guest.GoalFloor = guest.FloorLevel;
                 guest.Phase = "in_room";
                 guest.Nav = null;
                 guest.Path.Clear();
+                layout.UpdateElevation(guest);
             }
         }
 

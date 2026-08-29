@@ -267,7 +267,8 @@ namespace Vacancy
                 }
                 else if (area.Kind == AreaKind.Walkway)
                 {
-                    Box(area.Id, area.Rect, 0.05f, 0.08f, Palette.Hex("#5a6170"));
+                    float y = area.Level > 0 ? WorldScale.UpperFloorY + 0.05f : 0.05f;
+                    Box(area.Id, area.Rect, y, 0.08f, Palette.Hex("#5a6170"));
                 }
                 else if (area.Kind == AreaKind.Lobby)
                 {
@@ -282,7 +283,7 @@ namespace Vacancy
                     SlabWithHole(
                         area.Id + "-roof",
                         area.Rect,
-                        Pad(layout.Stairs, 4f),
+                        Pad(layout.UpperStairs.W > 0 ? layout.UpperStairs : layout.Stairs, 4f),
                         WorldScale.CeilingY,
                         0.08f,
                         Palette.Hex("#1a2030"));
@@ -295,7 +296,9 @@ namespace Vacancy
                 }
                 else if (area.Kind == AreaKind.Stairs)
                 {
-                    BuildStairwell(area);
+                    if (area.Level > 0) continue;
+                    if (area.Id != null && area.Id.StartsWith("stairs-up")) BuildUpperStairwell(area);
+                    else BuildStairwell(area);
                 }
                 else if (area.Kind == AreaKind.Department)
                 {
@@ -327,18 +330,22 @@ namespace Vacancy
 
             foreach (var planned in layout.Floor.Rooms)
             {
+                float baseY = planned.Level > 0 ? WorldScale.UpperFloorY : 0f;
                 var inner = Inset(planned.Rect, layout.Tile);
-                roomFloors[planned.Id] = Box($"RoomFloor-{planned.Id}", inner, 0.05f, 0.08f, Palette.Locked);
-                Walls($"Room-{planned.Id}", planned.Rect, DoorList(planned.DoorOpening), Palette.Wall);
-                RoomWindow(planned);
-                HangGuestDoor(planned);
+                roomFloors[planned.Id] = Box($"RoomFloor-{planned.Id}", inner, baseY + 0.05f, 0.08f, Palette.Locked);
+                Walls($"Room-{planned.Id}", planned.Rect, DoorList(planned.DoorOpening), Palette.Wall, baseY, null, planned.Level > 0 ? WorldScale.WallHeight : WorldScale.UpperFloorY);
+                RoomWindow(planned, baseY);
+                HangGuestDoor(planned, baseY);
                 Box(
                     $"Bed-{planned.Id}",
                     new Rect(inner.X + inner.W * 0.2f, inner.Y + inner.H * 0.25f, inner.W * 0.55f, inner.H * 0.4f),
-                    0.28f,
+                    baseY + 0.28f,
                     0.4f,
                     Palette.Hex("#3a455c"));
-                Box($"RoomRoof-{planned.Id}", planned.Rect, WorldScale.CeilingY, 0.08f, Palette.Hex("#1a2030"));
+                if (planned.Level > 0)
+                {
+                    Box($"RoomRoof-{planned.Id}", planned.Rect, baseY + WorldScale.CeilingY, 0.08f, Palette.Hex("#1a2030"));
+                }
             }
 
             BuildCoveredWalk();
@@ -415,6 +422,29 @@ namespace Vacancy
                 Box(
                     $"Stair-{i}",
                     new Rect(innerX + i * stepW, innerY, stepW, innerH),
+                    y + 0.08f,
+                    0.16f,
+                    Palette.Hex(i % 2 == 0 ? "#5a5048" : "#4a443c"));
+            }
+        }
+
+        void BuildUpperStairwell(FloorArea area)
+        {
+            Walls(area.Id, area.Rect, area.Doors, Palette.Wall, 0f, null, WorldScale.UpperFloorY + 0.15f);
+            int steps = 10;
+            float pad = layout.Tile;
+            float innerX = area.Rect.X + pad;
+            float innerY = area.Rect.Y + pad;
+            float innerW = area.Rect.W - pad * 2f;
+            float innerH = area.Rect.H - pad * 2f;
+            float stepH = innerH / steps;
+            for (int i = 0; i < steps; i++)
+            {
+                float t = 1f - (i + 0.5f) / steps;
+                float y = t * WorldScale.UpperFloorY;
+                Box(
+                    $"UpperStair-{i}",
+                    new Rect(innerX, innerY + i * stepH, innerW, stepH),
                     y + 0.08f,
                     0.16f,
                     Palette.Hex(i % 2 == 0 ? "#5a5048" : "#4a443c"));
@@ -1061,6 +1091,7 @@ namespace Vacancy
 
             foreach (var room in floor.Rooms)
             {
+                if (room.Level > 0) continue;
                 if (room.DoorSide == "east" && floor.WalkWest.W > 0f)
                 {
                     SquarePillar(
@@ -1080,19 +1111,44 @@ namespace Vacancy
                         pillar);
                 }
             }
+
+            var rail = Palette.Hex("#8a8490");
+            float railY = WorldScale.UpperFloorY + 0.55f;
+            if (floor.WalkWest.W > 0f)
+            {
+                Box(
+                    "WalkRail-West",
+                    new Rect(floor.WalkWest.X + floor.WalkWest.W - 4f, floor.WalkWest.Y, 4f, floor.WalkWest.H),
+                    railY,
+                    0.9f,
+                    rail,
+                    false);
+            }
+
+            if (floor.WalkNorth.W > 0f)
+            {
+                Box(
+                    "WalkRail-North",
+                    new Rect(floor.WalkNorth.X, floor.WalkNorth.Y + floor.WalkNorth.H - 4f, floor.WalkNorth.W, 4f),
+                    railY,
+                    0.9f,
+                    rail,
+                    false);
+            }
         }
 
         void SquarePillar(string name, float x, float y, float size, Color color)
         {
+            float h = WorldScale.UpperFloorY + 0.2f;
             Box(
                 name,
                 new Rect(x - size / 2f, y - size / 2f, size, size),
-                WorldScale.WallHeight * 0.48f,
-                WorldScale.WallHeight * 0.96f,
+                h * 0.5f,
+                h,
                 color);
         }
 
-        void RoomWindow(PlannedRoom planned)
+        void RoomWindow(PlannedRoom planned, float yBottom = 0f)
         {
             var door = planned.DoorOpening;
             if (door == null) return;
@@ -1111,7 +1167,7 @@ namespace Vacancy
                 Box(
                     $"Window-{planned.Id}",
                     new Rect(planned.Rect.X + planned.Rect.W - thick * 0.45f, y0, thick * 0.4f, winAlong),
-                    1.35f,
+                    yBottom + 1.35f,
                     1.1f,
                     glass,
                     false);
@@ -1127,7 +1183,7 @@ namespace Vacancy
                 Box(
                     $"Window-{planned.Id}",
                     new Rect(x0, planned.Rect.Y + planned.Rect.H - thick * 0.45f, winAlong, thick * 0.4f),
-                    1.35f,
+                    yBottom + 1.35f,
                     1.1f,
                     glass,
                     false);
@@ -1159,17 +1215,19 @@ namespace Vacancy
                 x1 = Mathf.Max(x1, room.Rect.X + room.Rect.W);
             }
 
+            float wallH = WorldScale.UpperFloorY + WorldScale.WallHeight;
+            float wallMid = wallH * 0.5f;
             Box(
                 "Envelope-West",
                 new Rect(x0 - thick, y0, thick, y1 - y0),
-                WorldScale.WallHeight * 0.5f,
-                WorldScale.WallHeight,
+                wallMid,
+                wallH,
                 color);
             Box(
                 "Envelope-North",
                 new Rect(x0 - thick, y0 - thick, x1 - x0 + thick, thick),
-                WorldScale.WallHeight * 0.5f,
-                WorldScale.WallHeight,
+                wallMid,
+                wallH,
                 color);
             float northDepth = floor.WalkNorth.H > 0f
                 ? floor.WalkNorth.Y + floor.WalkNorth.H - y0
@@ -1177,25 +1235,26 @@ namespace Vacancy
             Box(
                 "Envelope-NE",
                 new Rect(x1, y0 - thick, thick, northDepth + thick),
-                WorldScale.WallHeight * 0.5f,
-                WorldScale.WallHeight,
+                wallMid,
+                wallH,
                 color);
             if (floor.CornerMass.W > 0f)
             {
-                Box("CornerMass", floor.CornerMass, WorldScale.WallHeight * 0.5f, WorldScale.WallHeight, color);
-                Box("CornerRoof", floor.CornerMass, WorldScale.CeilingY, 0.08f, Palette.Hex("#1a2030"));
+                Box("CornerMass", floor.CornerMass, wallMid, wallH, color);
+                Box("CornerRoof", floor.CornerMass, WorldScale.UpperFloorY + WorldScale.CeilingY, 0.08f, Palette.Hex("#1a2030"));
             }
         }
 
-        void Walls(string name, Rect rect, List<Door> doors, Color color, float yBottom = 0f, string skipSide = null)
+        void Walls(string name, Rect rect, List<Door> doors, Color color, float yBottom = 0f, string skipSide = null, float wallHeight = 0f)
         {
-            if (skipSide != "north") AddSide(name + "-N", "north", rect, doors, color, yBottom);
-            if (skipSide != "south") AddSide(name + "-S", "south", rect, doors, color, yBottom);
-            if (skipSide != "west") AddSide(name + "-W", "west", rect, doors, color, yBottom);
-            if (skipSide != "east") AddSide(name + "-E", "east", rect, doors, color, yBottom);
+            if (wallHeight <= 0f) wallHeight = WorldScale.WallHeight;
+            if (skipSide != "north") AddSide(name + "-N", "north", rect, doors, color, yBottom, wallHeight);
+            if (skipSide != "south") AddSide(name + "-S", "south", rect, doors, color, yBottom, wallHeight);
+            if (skipSide != "west") AddSide(name + "-W", "west", rect, doors, color, yBottom, wallHeight);
+            if (skipSide != "east") AddSide(name + "-E", "east", rect, doors, color, yBottom, wallHeight);
         }
 
-        void AddSide(string name, string side, Rect rect, List<Door> doors, Color color, float yBottom)
+        void AddSide(string name, string side, Rect rect, List<Door> doors, Color color, float yBottom, float wallHeight)
         {
             var gaps = new List<Door>();
             if (doors != null)
@@ -1211,7 +1270,7 @@ namespace Vacancy
             float end = horiz ? rect.X + rect.W : rect.Y + rect.H;
             if (gaps.Count == 0)
             {
-                WallSpan(name, side, rect, start, end, color, yBottom);
+                WallSpan(name, side, rect, start, end, color, yBottom, wallHeight);
                 return;
             }
 
@@ -1229,15 +1288,15 @@ namespace Vacancy
                 float along = horiz ? door.Center.X : door.Center.Y;
                 float gap0 = along - door.Width / 2f;
                 float gap1 = gap0 + door.Width;
-                if (gap0 > cursor + 2f) WallSpan(name + i + "a", side, rect, cursor, gap0, color, yBottom);
+                if (gap0 > cursor + 2f) WallSpan(name + i + "a", side, rect, cursor, gap0, color, yBottom, wallHeight);
                 FrameOpening(name + i + "door", door, side, rect, color, yBottom);
                 if (gap1 > cursor) cursor = gap1;
             }
 
-            if (cursor < end - 2f) WallSpan(name + "z", side, rect, cursor, end, color, yBottom);
+            if (cursor < end - 2f) WallSpan(name + "z", side, rect, cursor, end, color, yBottom, wallHeight);
         }
 
-        void WallSpan(string name, string side, Rect rect, float from, float to, Color color, float yBottom)
+        void WallSpan(string name, string side, Rect rect, float from, float to, Color color, float yBottom, float wallHeight)
         {
             float len = to - from;
             if (len < 2f) return;
@@ -1248,7 +1307,7 @@ namespace Vacancy
             else if (side == "west") wallRect = new Rect(rect.X, from, thick, len);
             else wallRect = new Rect(rect.X + rect.W - thick, from, thick, len);
 
-            Box(name, wallRect, yBottom + WorldScale.WallHeight * 0.5f, WorldScale.WallHeight, color);
+            Box(name, wallRect, yBottom + wallHeight * 0.5f, wallHeight, color);
         }
 
         void FrameOpening(string name, Door door, string side, Rect rect, Color color, float yBottom)
@@ -1273,7 +1332,7 @@ namespace Vacancy
             Box(name + "-sill", opening, yBottom + 0.055f, 0.05f, Palette.Doorway);
         }
 
-        void HangGuestDoor(PlannedRoom planned)
+        void HangGuestDoor(PlannedRoom planned, float yBottom = 0f)
         {
             var door = planned?.DoorOpening;
             if (door == null) return;
@@ -1281,7 +1340,7 @@ namespace Vacancy
             bool south = door.Side == "south";
             if (!east && !south) return;
 
-            FrameGuestJambs(planned, door);
+            FrameGuestJambs(planned, door, yBottom);
 
             float thick = 5f;
             float leaf = door.Width * 0.9f;
@@ -1305,7 +1364,7 @@ namespace Vacancy
 
             var pivot = new GameObject($"RoomDoor-{planned.Id}").transform;
             pivot.SetParent(root, false);
-            pivot.position = WorldScale.ToWorld(hingeX, hingeY, 0f);
+            pivot.position = WorldScale.ToWorld(hingeX, hingeY, yBottom);
             pivot.rotation = Quaternion.Euler(0f, closedYaw, 0f);
 
             float leafM = WorldScale.Meters(leaf);
@@ -1334,14 +1393,14 @@ namespace Vacancy
             knobGo.transform.localScale = new Vector3(thickM + WorldScale.Meters(4f), 0.08f, WorldScale.Meters(4f));
             SetTrigger(knobGo);
 
-            var doorAnchor = WorldScale.ToWorld(door.Center.X, door.Center.Y, 1.55f);
+            var doorAnchor = WorldScale.ToWorld(door.Center.X, door.Center.Y, yBottom + 1.55f);
             var leafRenderer = leafGo.GetComponent<Renderer>();
             MarkInteract(leafRenderer, "room", planned.Id, doorAnchor);
             MarkInteract(knobGo.GetComponent<Renderer>(), "room", planned.Id, doorAnchor);
 
             var sensor = new GameObject($"RoomDoor-{planned.Id}-hover");
             sensor.transform.SetParent(root, false);
-            sensor.transform.position = WorldScale.ToWorld(door.Center.X, door.Center.Y, 1.15f);
+            sensor.transform.position = WorldScale.ToWorld(door.Center.X, door.Center.Y, yBottom + 1.15f);
             sensor.transform.localScale = east
                 ? WorldScale.Size(8f, 2.2f, leaf)
                 : WorldScale.Size(leaf, 2.2f, 8f);
@@ -1371,13 +1430,13 @@ namespace Vacancy
             });
         }
 
-        void FrameGuestJambs(PlannedRoom planned, Door door)
+        void FrameGuestJambs(PlannedRoom planned, Door door, float yBottom = 0f)
         {
             float thick = layout.Tile;
             float jamb = 4f;
             float lintelH = 0.55f;
             float height = WorldScale.WallHeight - lintelH - 0.08f;
-            float yCenter = 0.08f + height * 0.5f;
+            float yCenter = yBottom + 0.08f + height * 0.5f;
             if (door.Side == "east")
             {
                 float x = planned.Rect.X + planned.Rect.W - thick;
@@ -1442,7 +1501,8 @@ namespace Vacancy
 
             if (room == null || !room.Unlocked) return false;
 
-            if (player != null && player.FloorLevel == 0 && InDoorway(swinging, player.X, player.Y))
+            int roomFloor = layout.RoomFloor(swinging.RoomId);
+            if (player != null && player.FloorLevel == roomFloor && InDoorway(swinging, player.X, player.Y))
             {
                 return true;
             }
@@ -1451,7 +1511,7 @@ namespace Vacancy
             {
                 foreach (var guest in state.ActiveGuests)
                 {
-                    if (guest == null || guest.FloorLevel != 0 || guest.RoomId != swinging.RoomId) continue;
+                    if (guest == null || guest.FloorLevel != roomFloor || guest.RoomId != swinging.RoomId) continue;
                     if (InDoorway(swinging, guest.X, guest.Y)) return true;
                 }
             }
@@ -1460,7 +1520,7 @@ namespace Vacancy
             {
                 foreach (var person in staff)
                 {
-                    if (person == null || person.FloorLevel != 0) continue;
+                    if (person == null || person.FloorLevel != roomFloor) continue;
                     int targetId = person.TargetRoom != null ? person.TargetRoom.Id : 0;
                     int exitId = person.ExitRoomId ?? 0;
                     if (targetId != swinging.RoomId && exitId != swinging.RoomId) continue;
